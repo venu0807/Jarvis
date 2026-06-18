@@ -7,7 +7,8 @@ if (-not (Test-Path $ScriptPath)) {
     exit 1
 }
 
-$Action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c ""$ScriptPath""" -WorkingDirectory "D:\Proposals\Jarvis\automations\linkedin-outreach"
+$ArgString = '/c ""{0}" "{1}" >> cron.log 2>&1"' -f $PythonPath, $ScriptPath
+$Action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument $ArgString -WorkingDirectory "D:\Proposals\Jarvis\automations\linkedin-outreach"
 $Trigger = New-ScheduledTaskTrigger -Daily -At $TriggerTime
 $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden
 

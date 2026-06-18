@@ -77,7 +77,6 @@ SESSION_DIR = BASE_DIR / ".sessions"
 LOG_DIR     = BASE_DIR / "output" / "logs"
 SESSION_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
-
 APPLIED_LOG = LOG_DIR / "applied_jobs.json"
 
 # ── Applied job tracker ───────────────────────────────────────────────────────
@@ -113,102 +112,92 @@ async def run_portal(portal_name: str, portal_cls, jobs: list, context) -> list:
 
     print(f"\n{'='*54}\n🌐 Portal: {portal.name}\n{'='*54}")
 
-    # ── Login (uses saved session if valid) ───────────────────────────────────
-    logged_in = await portal.login(page)
-    if not logged_in:
-        await page.close()
-        return []
+    try:
+        # ── Login (uses saved session if valid) ───────────────────────────────────
+        logged_in = await portal.login(page)
+        if not logged_in:
+            return []
 
-    # ── Naukri: Playwright-based search after login ───────────────────────────
-    if portal_name == "naukri":
-        applied_today = load_applied()
-        naukri_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today, context=context)
-        save_applied({r.job["id"] for r in naukri_results if r.status == "applied"})
-        try:
-            await page.close()
-        except:
-            pass  # Page may already be closed
-        return naukri_results
+        # ── Naukri: Playwright-based search after login ───────────────────────────
+        if portal_name == "naukri":
+            applied_today = load_applied()
+            naukri_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today, context=context)
+            save_applied({r.job["id"] for r in naukri_results if r.status == "applied"})
+            return naukri_results
 
-    # ── Indeed: Playwright-based search after login ───────────────────────────
-    if portal_name == "indeed":
-        applied_today = load_applied()
-        indeed_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
-        save_applied({r.job["id"] for r in indeed_results if r.status == "applied"})
-        await page.close()
-        return indeed_results
+        # ── Indeed: Playwright-based search after login ───────────────────────────
+        if portal_name == "indeed":
+            applied_today = load_applied()
+            indeed_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
+            save_applied({r.job["id"] for r in indeed_results if r.status == "applied"})
+            return indeed_results
 
-    # ── Internshala: Playwright-based search after login ──────────────────────
-    if portal_name == "internshala":
-        applied_today = load_applied()
-        internshala_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
-        save_applied({r.job["id"] for r in internshala_results if r.status == "applied"})
-        await page.close()
-        return internshala_results
+        # ── Internshala: Playwright-based search after login ──────────────────────
+        if portal_name == "internshala":
+            applied_today = load_applied()
+            internshala_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
+            save_applied({r.job["id"] for r in internshala_results if r.status == "applied"})
+            return internshala_results
 
-    # ── CareerPages: company career pages (aggregator JSON APIs) ──────────────
-    if portal_name == "career_pages":
-        applied_today = load_applied()
-        career_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
-        save_applied({r.job["id"] for r in career_results if r.status == "applied"})
+        # ── CareerPages: company career pages (aggregator JSON APIs) ──────────────
+        if portal_name == "career_pages":
+            applied_today = load_applied()
+            career_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
+            save_applied({r.job["id"] for r in career_results if r.status == "applied"})
+            return career_results
+
+        # ── Foundit: Playwright-based search after login ──────────────────────────
+        if portal_name == "foundit":
+            applied_today = load_applied()
+            foundit_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
+            save_applied({r.job["id"] for r in foundit_results if r.status == "applied"})
+            return foundit_results
+
+        # ── Workday: public search + Playwright apply ─────────────────────────────
+        if portal_name == "workday":
+            applied_today = load_applied()
+            workday_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
+            save_applied({r.job["id"] for r in workday_results if r.status == "applied"})
+            return workday_results
+
+        # ── Other portals: use scraped jobs list ──────────────────────────────────
+        applied_today  = load_applied()
+        applied_count  = 0
+        portal_jobs    = [j for j in jobs if j.get("portal", "").lower() == portal_name.lower()]
+        print(f"  📋 {len(portal_jobs)} scraped jobs for {portal.name}")
+
+        for job in portal_jobs:
+            if applied_count >= DAILY_LIMIT:
+                print(f"  ✋ Daily limit of {DAILY_LIMIT} reached for {portal.name}")
+                break
+            if job["id"] in applied_today:
+                print(f"  ⏭️  Already applied: {job['title']} @ {job['company']}")
+                continue
+
+            print(f"\n  → {job['title']} @ {job['company']} ({job['location']})")
+            result = await portal.apply_to_job(page, job)
+            results.append(result)
+
+            if result.status == "applied":
+                applied_count += 1
+                applied_today.add(job["id"])
+                save_applied({job["id"]})
+            elif result.status == "manual":
+                print(f"     📋 Manual: {result.reason}")
+            elif result.status == "skipped":
+                print(f"     ⏭️  Skipped: {result.reason}")
+            elif result.status == "error":
+                print(f"     ❌ Error: {result.reason}")
+
+            await asyncio.sleep(random.uniform(4, 8))
+
+        return results
+
+    finally:
         try:
             await page.close()
         except:
             pass
-        return career_results
-
-    # ── Foundit: Playwright-based search after login ──────────────────────────
-    if portal_name == "foundit":
-        applied_today = load_applied()
-        foundit_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
-        save_applied({r.job["id"] for r in foundit_results if r.status == "applied"})
-        await page.close()
-        return foundit_results
-
-    # ── Workday: public search + Playwright apply ─────────────────────────────
-    if portal_name == "workday":
-        applied_today = load_applied()
-        workday_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
-        save_applied({r.job["id"] for r in workday_results if r.status == "applied"})
-        try:
-            await page.close()
-        except:
-            pass
-        return workday_results
-
-    # ── Other portals: use scraped jobs list ──────────────────────────────────
-    applied_today  = load_applied()
-    applied_count  = 0
-    portal_jobs    = [j for j in jobs if j.get("portal", "").lower() == portal_name.lower()]
-    print(f"  📋 {len(portal_jobs)} scraped jobs for {portal.name}")
-
-    for job in portal_jobs:
-        if applied_count >= DAILY_LIMIT:
-            print(f"  ✋ Daily limit of {DAILY_LIMIT} reached for {portal.name}")
-            break
-        if job["id"] in applied_today:
-            print(f"  ⏭️  Already applied: {job['title']} @ {job['company']}")
-            continue
-
-        print(f"\n  → {job['title']} @ {job['company']} ({job['location']})")
-        result = await portal.apply_to_job(page, job)
-        results.append(result)
-
-        if result.status == "applied":
-            applied_count += 1
-            applied_today.add(job["id"])
-            save_applied({job["id"]})
-        elif result.status == "manual":
-            print(f"     📋 Manual: {result.reason}")
-        elif result.status == "skipped":
-            print(f"     ⏭️  Skipped: {result.reason}")
-        elif result.status == "error":
-            print(f"     ❌ Error: {result.reason}")
-
-        await asyncio.sleep(random.uniform(4, 8))
-
-    await page.close()
-    return results
 
 
 
@@ -409,7 +398,7 @@ async def main_with_jobs(jobs: list) -> dict:
     return result
 
 
-async def _run(jobs: list) -> dict:
+async def _run(jobs: list, is_headless: bool = HEADLESS) -> dict:
     """Core apply logic used by both main() and main_with_jobs()."""
     today = datetime.date.today().isoformat()
     print(f"""
@@ -435,7 +424,7 @@ async def _run(jobs: list) -> dict:
 
     all_results: list = []
 
-    async with AsyncBrowser(headless=HEADLESS) as browser_mgr:
+    async with AsyncBrowser(headless=is_headless) as browser_mgr:
         for name, cls in portal_map.items():
             session_file = SESSION_DIR / f"{name}.json"
             if session_file.exists():

@@ -11,6 +11,7 @@ Run manually: python run_pipeline.py
 import asyncio
 import datetime
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -23,9 +24,12 @@ if sys.stderr.encoding != 'utf-8':
     sys.stderr.reconfigure(encoding='utf-8')
 
 from dotenv import load_dotenv
+from shared_utils import setup_logging
 
 BASE_DIR   = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
+
+log = setup_logging("pipeline", log_dir=BASE_DIR / "output"/ "logs")
 
 TODAY    = datetime.date.today().isoformat()
 JOB_FILE = BASE_DIR / "output" / f"jobs_{TODAY}.json"
@@ -92,7 +96,7 @@ def cleanup_old_files():
     Also cleans up old .sessions files (>30 days) to prevent stale cookie bloat.
     """
     import time
-    print(f"\n{'='*56}\n▶ Cleaning up old output files (>168 hours)\n{'='*56}")
+    log.info("Cleaning up old output files (>168 hours)")
     output_dir = BASE_DIR / "output"
     if output_dir.exists():
         cutoff_time = time.time() - (168 * 3600)
@@ -113,7 +117,7 @@ def cleanup_old_files():
                     except Exception as e:
                         print(f"     ⚠️  Failed to delete {file}: {e}")
 
-        print(f"  ✅ Deleted {deleted_count} old output files")
+        log.info("Deleted %d old output files", deleted_count)
 
     # ── Clean old .sessions files (>30 days) ──────────────────────────────
     sessions_dir = BASE_DIR / ".sessions"
@@ -130,7 +134,7 @@ def cleanup_old_files():
                 except Exception as e:
                     print(f"     ⚠️  Failed to archive stale session {sess_file.name}: {e}")
         if purged:
-            print(f"  ✅ Archived {purged} stale session files (>30 days)")
+            log.info("Archived %d stale session files (>30 days)", purged)
 
 
 def check_failure_rates(days_back: int = 7, threshold: float = 0.5) -> list:
@@ -205,18 +209,18 @@ def main():
     cleanup_old_files()
 
     # ── Pre-flight: check failure rates from recent runs ────────────────────
-    print(f"\n{'='*56}\n▶ Checking failure rate trends (last 7 days)\n{'='*56}")
+    log.info("Checking failure rate trends (last 7 days)")
     alerts = check_failure_rates(days_back=7, threshold=0.5)
     if alerts:
-        print(f"  ⚠️  Found {len(alerts)} portal(s) with high manual/error rates:")
+        log.warning("Found %d portal(s) with high manual/error rates", len(alerts))
         for alert in alerts:
-            print(f"     ⚠️  {alert['message']}")
-        print(f"     💡 Review these portals' DOM selectors for UI changes.")
+            log.warning("  %s", alert['message'])
+        log.warning("Review these portals' DOM selectors for UI changes.")
     else:
-        print(f"  ✅ No portals exceeding 50% manual/error rate in last 7 days.")
+        log.info("No portals exceeding 50%% manual/error rate in last 7 days.")
 
     # ── Step 1: Auto-apply (login ONCE, sessions persist) ─────────────────────
-    print(f"\n{'='*56}\n▶ Step 1/3 — Auto-applying (all portals, live search)\n{'='*56}")
+    log.info("Step 1/3 — Auto-applying (all portals, live search)")
     try:
         # Import and run async main directly (avoids subprocess overhead)
         import auto_applier
@@ -233,16 +237,16 @@ def main():
                        "_manual_jobs": [], "_skipped_jobs": []}
 
     # ── Step 2: Tailor resumes for manual/skipped jobs only ───────────────────
-    print(f"\n{'='*56}\n▶ Step 2/3 — Tailoring resumes for manual jobs\n{'='*56}")
+    log.info("Step 2/3 — Tailoring resumes for manual jobs")
     summary = tailor_manual_resumes(summary)
 
     # Save enriched summary (with PDF paths)
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     LOG_FILE.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"  📊 Application log updated → {LOG_FILE.name}")
+    log.info("Application log updated → %s", LOG_FILE.name)
 
     # ── Step 3: Send notifications (email-only) ─────────────────────────────────
-    print(f"\n{'='*56}\n▶ Step 3/3 — Sending email summary\n{'='*56}")
+    log.info("Step 3/3 — Sending email summary")
     from notifier import notify
     notify(summary)
 

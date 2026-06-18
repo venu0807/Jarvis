@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "jarvis-automation"
+version = "1.0.0"
+description = "AI-Powered personal automation suite — job applications, Pinterest marketing, LinkedIn outreach"
+requires-python = ">=3.9"
+dependencies = [
+    "playwright>=1.40.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+job-automation = [
+    "beautifulsoup4",
+    "pdfplumber",
+    "reportlab",
+]
+pinterest = [
+    "pandas>=2.0.0",
+    "Pillow>=10.0.0",
+    "moviepy",
+]
+linkedin = [
+    "ollama",
+]
+interview-bot = [
+    "google-api-python-client>=2.118.0",
+    "google-auth-httplib2>=0.2.0",
+    "google-auth-oauthlib>=1.2.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests", "automations"]
+
+[tool.setuptools.packages.find]
+include = ["jarvis_browser", "shared_utils"]

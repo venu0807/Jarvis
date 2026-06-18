@@ -155,29 +155,23 @@ def _resolve_resume_path() -> Optional[str]:
 def _apply_greenhouse(payload: dict, profile: dict, resume_path: Optional[str]) -> tuple[bool, str]:
     """Greenhouse public apply. Multipart with resume file (if available)."""
     url = GH_APPLY_TMPL.format(token=payload["token"], id=payload["id"])
-    files = {}
     data = {
         "first_name": profile["first_name"],
         "last_name":  profile["last_name"],
         "email":      profile["email"],
         "phone":      profile["phone"],
     }
-    if resume_path and Path(resume_path).exists():
-        with open(resume_path, "rb") as _fh:
-            files = {"resume": _fh}
-            try:
-                r = requests.post(url, data=data, files=files, timeout=30)
+    try:
+        if resume_path and Path(resume_path).exists():
+            with open(resume_path, "rb") as fh:
+                r = requests.post(url, data=data, files={"resume": fh}, timeout=30)
+        else:
+            r = requests.post(url, data=data, files={}, timeout=30)
         if r.status_code in (200, 201):
             return True, f"greenhouse 200 ({r.json().get('application_id', 'n/a')})"
         return False, f"greenhouse {r.status_code}: {r.text[:180]}"
-    else:
-        try:
-            r = requests.post(url, data=data, files={}, timeout=30)
-            if r.status_code in (200, 201):
-                return True, f"greenhouse 200 ({r.json().get('application_id', 'n/a')})"
-            return False, f"greenhouse {r.status_code}: {r.text[:180]}"
-        except Exception as e:
-            return False, f"greenhouse exception: {type(e).__name__}: {str(e)[:160]}"
+    except Exception as e:
+        return False, f"greenhouse exception: {type(e).__name__}: {str(e)[:160]}"
 
 
 def _apply_lever(payload: dict, profile: dict, resume_path: Optional[str]) -> tuple[bool, str]:
@@ -190,13 +184,12 @@ def _apply_lever(payload: dict, profile: dict, resume_path: Optional[str]) -> tu
         "org":       "Personal",
         "comments":  "Auto-applied via JARVIS (cover letter omitted — see resume)."
     }
-    files = {}
-    if resume_path and Path(resume_path).exists():
-        files = {"resume": open(resume_path, "rb")}
     try:
-        r = requests.post(url, data=data, files=files, timeout=30)
-        if files.get("resume"):
-            files["resume"].close()
+        if resume_path and Path(resume_path).exists():
+            with open(resume_path, "rb") as fh:
+                r = requests.post(url, data=data, files={"resume": fh}, timeout=30)
+        else:
+            r = requests.post(url, data=data, files={}, timeout=30)
         if r.status_code in (200, 201):
             return True, "lever 200"
         return False, f"lever {r.status_code}: {r.text[:180]}"

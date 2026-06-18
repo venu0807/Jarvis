@@ -23,7 +23,8 @@ if (-not $PythonPath) {
 
 Write-Host "Using Python: $PythonPath" -ForegroundColor Cyan
 
-$Action = New-ScheduledTaskAction -Execute $PythonPath -Argument """$ScriptPath""" -WorkingDirectory "D:\Proposals\Jarvis\automations\job-automation"
+$ArgString = '/c ""{0}" "{1}" >> cron.log 2>&1"' -f $PythonPath, $ScriptPath
+$Action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument $ArgString -WorkingDirectory "D:\Proposals\Jarvis\automations\job-automation"
 $Trigger = New-ScheduledTaskTrigger -Daily -At $TriggerTime
 $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden
 

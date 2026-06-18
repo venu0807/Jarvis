@@ -31,9 +31,13 @@ from extractor import extract_contact_info
 from composer import generate_cold_email
 from mailer import send_email
 
+from shared_utils import setup_logging
+
 # ── Paths & config ─────────────────────────────────────────────────────────────
 
 BASE_DIR = Path(__file__).resolve().parent
+
+log = setup_logging("linkedin_outreach", log_dir=BASE_DIR / "logs")
 
 # Fix #9: load .env from main.py's directory regardless of cwd
 load_dotenv(BASE_DIR / ".env")

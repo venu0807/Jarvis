@@ -257,6 +257,58 @@ def atomic_write_text(path: str | Path, content: str, encoding: str = "utf-8") -
 
 
 # ---------------------------------------------------------------------------
+# Session age checker — alert when portal sessions are about to expire
+# ---------------------------------------------------------------------------
+
+def check_session_ages(
+    session_dir: str | Path,
+    max_age_days: int = 25,
+    warn_threshold_days: int = 20,
+) -> list[dict]:
+    """Scan a session directory and report session file ages.
+
+    Returns a list of dicts with keys:
+        portal: session file stem (e.g. "naukri")
+        path: absolute path to session file
+        age_days: how old the session is
+        status: "fresh" | "warn" (near expiry) | "stale" (expired, >max_age_days)
+
+    Example:
+        alerts = check_session_ages(".sessions")
+        for a in alerts:
+            if a["status"] != "fresh":
+                log.warning("Session %s is %s (%d days old)",
+                            a["portal"], a["status"], a["age_days"])
+    """
+    session_dir = Path(session_dir)
+    if not session_dir.exists():
+        return []
+
+    now = datetime.now(timezone.utc).timestamp()
+    results: list[dict] = []
+
+    for sess_file in sorted(session_dir.glob("*.json")):
+        age_seconds = now - sess_file.stat().st_mtime
+        age_days = age_seconds / 86400
+
+        if age_days > max_age_days:
+            status = "stale"
+        elif age_days > warn_threshold_days:
+            status = "warn"
+        else:
+            status = "fresh"
+
+        results.append({
+            "portal": sess_file.stem,
+            "path": str(sess_file),
+            "age_days": round(age_days, 1),
+            "status": status,
+        })
+
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Time helpers (IST = UTC+5:30)
 # ---------------------------------------------------------------------------
 

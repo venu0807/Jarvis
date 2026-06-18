@@ -39,9 +39,9 @@ foreach ($cfg in $TaskConfigs) {
     $TaskArgs = $cfg.Args
 
     # Build argument string: script path followed by the task name
-    $ArgString = "`"$ScriptPath`" $TaskArgs"
+    $ArgString = '/c ""{0}" "{1}" {2} >> cron_{2}.log 2>&1"' -f $PythonPath, $ScriptPath, $TaskArgs
 
-    $Action = New-ScheduledTaskAction -Execute $PythonPath -Argument $ArgString -WorkingDirectory "D:\Proposals\Jarvis\automations\pinterest"
+    $Action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument $ArgString -WorkingDirectory "D:\Proposals\Jarvis\automations\pinterest"
     $Trigger = New-ScheduledTaskTrigger -Daily -At $TriggerTime
     $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden
 

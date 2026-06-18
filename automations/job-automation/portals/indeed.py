@@ -5,7 +5,9 @@ portals/indeed.py — Indeed Easy Apply with persistent session support
 - Handles "Use your Indeed Resume" confirmation step
 - Detects already-applied state
 """
+from __future__ import annotations
 import json
+import os
 import random
 from pathlib import Path
 from playwright.async_api import Page
@@ -490,13 +492,6 @@ class IndeedPortal(BasePortal):
         except Exception as e:
             return ApplicationResult(job=job, status="error", reason=str(e))
 
-    async def _close_popup(self, apply_page: Page, main_page: Page):
-        try:
-            if apply_page != main_page:
-                await apply_page.close()
-        except:
-            pass
-
     async def _close_target(self, target, main_page: Page):
         """Close target if it's a popup Page (not a FrameLocator or main page)."""
         try:
@@ -505,17 +500,19 @@ class IndeedPortal(BasePortal):
         except:
             pass
 
+    _SUCCESS_SELECTORS = [
+        ":has-text('application was sent')",
+        ":has-text('Application submitted')",
+        ":has-text('Your application has been submitted')",
+        ":has-text('successfully applied')",
+        ":has-text('Application sent')",
+        ".ia-PostApply",
+        "[data-testid='applicationConfirmation']",
+    ]
+
     async def _is_submitted_target(self, target) -> bool:
         """Check submission success — works on both Page and FrameLocator."""
-        for sel in [
-            ":has-text('application was sent')",
-            ":has-text('Application submitted')",
-            ":has-text('Your application has been submitted')",
-            ":has-text('successfully applied')",
-            ":has-text('Application sent')",
-            ".ia-PostApply",
-            "[data-testid='applicationConfirmation']",
-        ]:
+        for sel in self._SUCCESS_SELECTORS:
             try:
                 if await target.locator(sel).first.is_visible(timeout=500):
                     return True
@@ -525,15 +522,7 @@ class IndeedPortal(BasePortal):
 
     async def _is_submitted_target_loc(self, loc) -> bool:
         """Check submission — takes a loc() callable."""
-        for sel in [
-            ":has-text('application was sent')",
-            ":has-text('Application submitted')",
-            ":has-text('Your application has been submitted')",
-            ":has-text('successfully applied')",
-            ":has-text('Application sent')",
-            ".ia-PostApply",
-            "[data-testid='applicationConfirmation']",
-        ]:
+        for sel in self._SUCCESS_SELECTORS:
             try:
                 if await loc(sel).is_visible(timeout=500):
                     return True
@@ -541,93 +530,79 @@ class IndeedPortal(BasePortal):
                 pass
         return False
 
-    async def _fill_fields_loc(self, loc):
-        """Fill form fields — takes a loc() callable (works for Frame/Page/popup)."""
-        # Job title — leave "Student" if already filled, set if blank
-        for sel in ["input[id*='jobTitle']", "input[placeholder*='Job title' i]",
-                    "input[aria-label*='job title' i]", "input[name*='jobTitle']"]:
+    async def _build_context(self, el) -> str:
+        """Build lowercased context string from aria-label, name, id, and label."""
+        ctx_parts = []
+        for attr in ["aria-label", "name", "id"]:
             try:
-                el = loc(sel)
-                if await el.is_visible(timeout=600):
-                    cur = await el.input_value()
-                    if not cur:
-                        await el.fill("Student")
-                    break
-            except:
-                continue
+                v = await el.get_attribute(attr) or ""
+                ctx_parts.append(v)
+            except Exception:
+                pass
+        try:
+            label_text = await el.evaluate("n => n.closest('label') ? n.closest('label').innerText : ''")
+            ctx_parts.append(label_text or "")
+        except Exception:
+            pass
+        return " ".join(ctx_parts).lower()
 
-        # Company / School
-        for sel in ["input[id*='company']", "input[placeholder*='Company' i]",
-                    "input[id*='employer']", "input[aria-label*='company' i]",
-                    "input[name*='company']"]:
-            try:
-                el = loc(sel)
-                if await el.is_visible(timeout=600):
-                    cur = await el.input_value()
-                    if not cur:
-                        await el.fill(os.getenv("USER_UNIVERSITY", "Your University"))
-                    break
-            except:
-                continue
+    @staticmethod
+    def _resolve_field_value(ctx: str) -> str | None:
+        """Given a context string, return the appropriate fill value or None to skip."""
+        if "year" in ctx or "experience" in ctx:
+            return "0"
+        if "salary" in ctx or "ctc" in ctx or "expected" in ctx or "pay" in ctx:
+            return "0"
+        if "degree" in ctx or "education" in ctx or "qualification" in ctx:
+            return "MCA"
+        if "skill" in ctx or "technology" in ctx or "tools" in ctx:
+            return "Python, Django, Machine Learning, React, JavaScript"
+        if "notice" in ctx or "join" in ctx:
+            return "15"
+        if "name" in ctx and "company" not in ctx:
+            return None  # skip
+        if "link" in ctx or "url" in ctx or "portfolio" in ctx or "website" in ctx:
+            return os.getenv("USER_GITHUB_URL", "https://github.com/")
+        return None
 
-        # Phone
-        for sel in ["input[type='tel']", "input[id*='phone']", "input[name*='phone']",
-                    "input[placeholder*='hone' i]"]:
+    async def _fill_field_single(self, loc, selectors: list[str], value: str) -> bool:
+        """Find a visible element by one of the selectors and fill it if empty."""
+        for sel in selectors:
             try:
                 el = loc(sel)
                 if await el.is_visible(timeout=400):
                     cur = await el.input_value()
                     if not cur:
-                        await el.fill(os.getenv("USER_PHONE", "+910000000000"))
-                    break
+                        await el.fill(value)
+                    return True
             except:
                 continue
+        return False
 
-        # Smart Text/Number Inputs (Years of experience, salary, etc.)
+    async def _fill_text_inputs(self, loc):
+        """Smart fill for text/number inputs based on label context."""
         try:
             inputs = loc("input[type='text'], input[type='number']")
             ic = await inputs.count()
             for i in range(ic):
                 el = inputs.nth(i)
-                if await el.is_visible(timeout=200):
-                    val = await el.input_value()
-                    if not val:
-                        # Grab context from aria-label or id/name
-                        ctx = ((await el.get_attribute("aria-label")) or "").lower()
-                        ctx += " " + ((await el.get_attribute("name")) or "").lower()
-                        ctx += " " + ((await el.get_attribute("id")) or "").lower()
-                        
-                        try: # Try to get label text
-                            ctx += " " + str(await el.evaluate("n => n.closest('label') ? n.closest('label').innerText : ''")).lower()
-                        except: pass
-
-                        if "year" in ctx or "experience" in ctx:
-                            await el.fill("0")
-                        elif "salary" in ctx or "ctc" in ctx or "expected" in ctx or "pay" in ctx:
-                            await el.fill("0")
-                        elif "degree" in ctx or "education" in ctx or "qualification" in ctx:
-                            await el.fill("MCA")
-                        elif "skill" in ctx or "technology" in ctx or "tools" in ctx:
-                            await el.fill("Python, Django, Machine Learning, React, JavaScript")
-                        elif "notice" in ctx or "join" in ctx:
-                            await el.fill("15")
-                        elif "name" in ctx and "company" not in ctx:
-                            pass # leave names alone
-                        elif "link" in ctx or "url" in ctx or "portfolio" in ctx or "website" in ctx:
-                            await el.fill(os.getenv("USER_GITHUB_URL", "https://github.com/"))
-                        else:
-                            # Generic fallback for required inputs
-                            req1 = await el.get_attribute("required")
-                            req2 = await el.get_attribute("aria-required")
-                            if req1 is not None or req2 == "true":
-                                await el.fill("1") # '1' is a safe fallback for numbers and text
-        except:
+                if not await el.is_visible(timeout=200):
+                    continue
+                val = await el.input_value()
+                if val:
+                    continue
+                ctx = await self._build_context(el)
+                resolved = self._resolve_field_value(ctx)
+                if resolved is not None:
+                    await el.fill(resolved)
+        except Exception:
             pass
 
-        # Radio — prefer Yes, fallback to first option
+    async def _fill_radios(self, loc):
+        """Check radio groups — prefer Yes, fallback to first option."""
         try:
             radios = loc("input[type='radio']")
-            count = await radios.count() if hasattr(radios, "count") else 0
+            count = await radios.count()
             seen: set = set()
             for i in range(count):
                 r = radios.nth(i)
@@ -635,8 +610,6 @@ class IndeedPortal(BasePortal):
                 if name in seen:
                     continue
                 seen.add(name)
-                
-                # Group radios by name
                 group = []
                 has_checked = False
                 for j in range(count):
@@ -645,25 +618,29 @@ class IndeedPortal(BasePortal):
                         group.append(rv)
                         if await rv.is_checked():
                             has_checked = True
-                            
-                if not has_checked and group:
-                    clicked = False
-                    for rv in group:
-                        val = str(await rv.get_attribute("value")).lower()
-                        label_text = ""
-                        try: label_text = str(await rv.evaluate("n => n.closest('label') ? n.closest('label').innerText : ''")).lower()
-                        except: pass
-                        
-                        if val in ["yes", "true", "1", "y"] or "yes" in label_text:
-                            await rv.click(force=True)
-                            clicked = True
-                            break
-                    if not clicked:
-                        await group[0].click(force=True)
-        except:
+                if has_checked or not group:
+                    continue
+                clicked = False
+                for rv in group:
+                    val = str(await rv.get_attribute("value")).lower()
+                    label_text = ""
+                    try:
+                        label_text = str(await rv.evaluate(
+                            "n => n.closest('label') ? n.closest('label').innerText : ''"
+                        )).lower()
+                    except Exception:
+                        pass
+                    if val in ["yes", "true", "1", "y"] or "yes" in label_text:
+                        await rv.click(force=True)
+                        clicked = True
+                        break
+                if not clicked:
+                    await group[0].click(force=True)
+        except Exception:
             pass
-            
-        # Checkboxes - mostly "I agree" or terms
+
+    async def _fill_checkboxes(self, loc):
+        """Check unchecked checkboxes."""
         try:
             checkboxes = loc("input[type='checkbox']")
             cc = await checkboxes.count()
@@ -671,128 +648,58 @@ class IndeedPortal(BasePortal):
                 cb = checkboxes.nth(i)
                 if await cb.is_visible(timeout=200) and not await cb.is_checked():
                     await cb.click(force=True)
-        except:
+        except Exception:
             pass
 
-        # Dropdowns
+    async def _fill_dropdowns(self, loc):
+        """Fill select dropdowns with first non-empty option."""
         try:
             selects = loc("select")
-            sc = await selects.count() if hasattr(selects, "count") else 0
+            sc = await selects.count()
             for i in range(sc):
-                try:
-                    sel_el = selects.nth(i)
-                    if not await sel_el.is_visible(timeout=300):
-                        continue
-                    opts = await sel_el.locator("option").all()
-                    for opt in opts:
-                        v = (await opt.get_attribute("value")) or ""
-                        if v and v.lower() not in ["", "0", "select", "none", "please select"]:
-                            await sel_el.select_option(v)
-                            break
-                except:
+                sel_el = selects.nth(i)
+                if not await sel_el.is_visible(timeout=300):
                     continue
-        except:
+                opts = await sel_el.locator("option").all()
+                for opt in opts:
+                    v = (await opt.get_attribute("value")) or ""
+                    if v and v.lower() not in ["", "0", "select", "none", "please select"]:
+                        await sel_el.select_option(v)
+                        break
+        except Exception:
             pass
+
+    async def _fill_fields_loc(self, loc):
+        """Fill form fields — takes a loc() callable (works for Frame/Page/popup)."""
+        await self._fill_field_single(loc, [
+            "input[id*='jobTitle']", "input[placeholder*='Job title' i]",
+            "input[aria-label*='job title' i]", "input[name*='jobTitle']"
+        ], "Student")
+
+        await self._fill_field_single(loc, [
+            "input[id*='company']", "input[placeholder*='Company' i]",
+            "input[id*='employer']", "input[aria-label*='company' i]", "input[name*='company']"
+        ], os.getenv("USER_UNIVERSITY", "Your University"))
+
+        await self._fill_field_single(loc, [
+            "input[type='tel']", "input[id*='phone']", "input[name*='phone']",
+            "input[placeholder*='hone' i]"
+        ], os.getenv("USER_PHONE", "+910000000000"))
+
+        await self._fill_text_inputs(loc)
+        await self._fill_radios(loc)
+        await self._fill_checkboxes(loc)
+        await self._fill_dropdowns(loc)
 
 
     # ── Field filling ─────────────────────────────────────────────────────────
 
     async def _fill_fields(self, p: Page):
-        # Job title
-        for sel in ["input[placeholder='Job title']", "input[id*='jobTitle']", "input[aria-label*='job title' i]"]:
-            try:
-                el = p.locator(sel).first
-                if await el.is_visible(timeout=500):
-                    if await el.input_value() in ("", "Student"):
-                        pass  # keep what's already there
-                    break
-            except:
-                continue
-
-        # Company
-        for sel in ["input[placeholder='Company']", "input[id*='company']", "input[aria-label*='company' i]"]:
-            try:
-                el = p.locator(sel).first
-                if await el.is_visible(timeout=500):
-                    if not await el.input_value():
-                        await el.fill(os.getenv("USER_UNIVERSITY", "Your University"))
-                    break
-            except:
-                continue
-
-        # Phone
-        for sel in ["input[type='tel']", "input[id*='phone']", "input[placeholder*='hone']"]:
-            try:
-                el = p.locator(sel).first
-                if await el.is_visible(timeout=500):
-                    if not await el.input_value():
-                        await el.fill(os.getenv("USER_PHONE", "+910000000000"))
-                    break
-            except:
-                continue
-
-        # Radio buttons — prefer Yes
-        try:
-            radios = p.locator("input[type='radio']")
-            count = await radios.count()
-            handled: set = set()
-            for i in range(count):
-                r = radios.nth(i)
-                name = (await r.get_attribute("name")) or f"r{i}"
-                if name in handled:
-                    continue
-                handled.add(name)
-                group = p.locator(f"input[type='radio'][name='{name}']")
-                gc = await group.count()
-                selected = False
-                for j in range(gc):
-                    val = ((await group.nth(j).get_attribute("value")) or "").lower()
-                    if val in ["yes", "true", "1", "y"]:
-                        if not await group.nth(j).is_checked():
-                            await group.nth(j).click()
-                        selected = True
-                        break
-                if not selected and gc > 0:
-                    if not await group.nth(0).is_checked():
-                        await group.nth(0).click()
-        except:
-            pass
-
-        # Dropdowns
-        try:
-            selects = p.locator("select")
-            sc = await selects.count()
-            for i in range(sc):
-                try:
-                    sel_el = selects.nth(i)
-                    if not await sel_el.is_visible(timeout=400):
-                        continue
-                    opts = await sel_el.locator("option").all()
-                    for opt in opts:
-                        v = (await opt.get_attribute("value")) or ""
-                        if v and v.lower() not in ["", "0", "select", "none", "please select"]:
-                            await sel_el.select_option(v)
-                            break
-                except:
-                    continue
-        except:
-            pass
+        """Fill form fields on a Page directly (delegates to loc-based helpers)."""
+        def loc(sel): return p.locator(sel).first
+        await self._fill_fields_loc(loc)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     async def _is_submitted(self, p: Page) -> bool:
-        for sel in [
-            "h1:has-text('application was sent')",
-            "h1:has-text('Application submitted')",
-            ":has-text('Your application has been submitted')",
-            ":has-text('successfully applied')",
-            ":has-text('Application sent')",
-            ".ia-PostApply",
-            "[data-testid='applicationConfirmation']",
-        ]:
-            try:
-                if await p.locator(sel).first.is_visible(timeout=500):
-                    return True
-            except:
-                pass
-        return False
+        return await self._is_submitted_target(p)
