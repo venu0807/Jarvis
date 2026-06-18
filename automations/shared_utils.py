@@ -2,13 +2,19 @@
 shared_utils.py — Shared utilities for JARVIS automations.
 
 Provides:
+  - setup_logging for consistent structured logging
   - retry decorator with exponential backoff for transient failures
-  - StructuredLogWriter for consistent JSONL logging
+  - StructuredLogWriter for persistent JSONL event logs
   - sleep_with_jitter for humanized pacing
   - safe_path_resolve for cross-script path resolution
+  - atomic_write_text for safe file writes
+  - ist_now / today_ist for IST time helpers
 
 Usage:
-    from shared_utils import retry, safe_path_resolve, sleep_with_jitter
+    from shared_utils import setup_logging, retry, sleep_with_jitter
+
+    log = setup_logging("my_bot")
+    log.info("Pipeline started")
 
     @retry(max_attempts=3, delay=2.0, backoff=2.0)
     def fetch_page(url):
@@ -19,14 +25,99 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 import os
 import random
+import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar
 
 T = TypeVar("T", bound=Callable[..., Any])
+
+
+# ---------------------------------------------------------------------------
+# Setup logging — single source of truth for all automations
+# ---------------------------------------------------------------------------
+
+def setup_logging(
+    name: str,
+    log_dir: str | Path | None = None,
+    level: int = logging.INFO,
+    console: bool = True,
+    file: bool = True,
+) -> logging.Logger:
+    """Return a configured logger for the given automation name.
+
+    Creates a logger with:
+      - A file handler writing to ``{log_dir}/{name}_{date}.log``
+      - A console handler with timestamp and level (if console=True)
+      - Structured format: ``[HH:MM:SS] LEVEL  message``
+
+    Args:
+        name: Short bot/script name (e.g. "auto_applier", "linkedin_bot").
+        log_dir: Directory for log files. If None, auto-detects based on
+            the calling script's location (looks for ``output/logs/`` under
+            each automation's directory).
+        level: Logging level (default: logging.INFO).
+        console: Whether to emit logs to stderr (default: True).
+        file: Whether to write logs to a daily file (default: True).
+
+    Returns:
+        A ``logging.Logger`` instance. Use ``log.info(...)``, ``log.error(...)``, etc.
+
+    Example::
+        log = setup_logging("auto_applier")
+        log.info("Session loaded for portal=%s", portal_name)
+        log.warning("Rate limit hit, backing off %ds", wait)
+        log.error("Login failed: %s", exc_info=True)
+    """
+    logger = logging.getLogger(name)
+    if logger.handlers:
+        return logger  # already configured
+
+    logger.setLevel(level)
+    logger.propagate = False
+
+    fmt = logging.Formatter("[%(asctime)s] %(levelname)-5s  %(message)s", datefmt="%H:%M:%S")
+
+    # ── Console handler ────────────────────────────────────────────────────
+    if console:
+        ch = logging.StreamHandler(sys.stderr)
+        ch.setLevel(level)
+        ch.setFormatter(fmt)
+        logger.addHandler(ch)
+
+    # ── File handler ───────────────────────────────────────────────────────
+    if file:
+        if log_dir is None:
+            log_dir = _detect_log_dir(name)
+        log_dir = Path(log_dir)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        log_path = log_dir / f"{name}_{today_str}.log"
+        fh = logging.FileHandler(str(log_path), encoding="utf-8")
+        fh.setLevel(level)
+        fh.setFormatter(fmt)
+        logger.addHandler(fh)
+
+    return logger
+
+
+def _detect_log_dir(name: str) -> Path:
+    """Walk up from the caller's frame to find an ``output/logs/`` directory."""
+    try:
+        frame = sys._getframe(2)
+        caller = Path(frame.f_globals.get("__file__", "") or ".")
+        for parent in [caller.parent] + list(caller.parents):
+            candidate = parent / "output" / "logs"
+            if candidate.exists():
+                return candidate
+        # Fallback: project-root/logs/automation_name/
+        return Path("logs") / name
+    except Exception:
+        return Path("logs") / name
 
 
 # ---------------------------------------------------------------------------
