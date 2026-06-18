@@ -83,3 +83,4 @@ nul
 scratch/
 *.bak
 *.pre-reauth
+wd_browser/
