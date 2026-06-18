@@ -1,0 +1,30 @@
+{
+  "default_mode": "hybrid",
+  "default_cloud_model": "",
+  "default_local_model": "phi4-mini:latest",
+  "ollama_url": "http://localhost:11434",
+  "allowed_cloud_providers": [
+    "ollama-cloud",
+    "nvidia",
+    "groq"
+  ],
+  "denied_cloud_providers": [
+    "openai",
+    "anthropic"
+  ],
+  "denied_cloud_models": [
+    "gemma4:31b-cloud",
+    "gpt-oss:120b-cloud",
+    "minimaxai/minimax-m3",
+    "minimax-m3:cloud",
+    "phi4-cloud",
+    "qwen-cloud",
+    "llama-cloud"
+  ],
+  "redaction_aggressiveness": "high",
+  "telegram_command_override": false,
+  "audit_all_calls": true,
+  "strict_workspace_layout": true,
+  "_telegram_disabled_note": "Telegram removed 2026-06-16. Email is the sole notification channel. No Telegram bot, no Telegram command interface, no Telegram chat. This flag kept false for legacy callers but is no-op.",
+  "_strict_workspace_layout_help": "When true, warn_on_legacy_openclaw_path() raises RuntimeError instead of soft warning. Audit-log always fires."
+}

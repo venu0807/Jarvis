@@ -1,0 +1,55 @@
+{
+  "trending": {
+    "products": [
+      {
+        "asin": "B08JHCVHTY",
+        "name": "Trending Product B08JHCVHTY",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "tech"
+      },
+      {
+        "asin": "B0DCH8VDXF",
+        "name": "Trending Product B0DCH8VDXF",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "tech"
+      },
+      {
+        "asin": "B00E4GACB8",
+        "name": "Trending Product B00E4GACB8",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "dorm_decor"
+      },
+      {
+        "asin": "B01M16WBW1",
+        "name": "Trending Product B01M16WBW1",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "dorm_decor"
+      },
+      {
+        "asin": "B01FV0F8H8",
+        "name": "Trending Product B01FV0F8H8",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "study_supplies"
+      },
+      {
+        "asin": "B084131T6G",
+        "name": "Trending Product B084131T6G",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "study_supplies"
+      }
+    ],
+    "timestamp": 1781702341.1136851
+  }
+}

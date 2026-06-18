@@ -1,0 +1,9 @@
+name,email,role,post_text
+Sarah Chen,sarah.chen@example.com,Backend Developer,"We're hiring a backend dev for our fintech. Python/Django required, plus AI/ML a plus."
+Priya Sharma,priya.sharma@example.in,Full Stack AI Engineer,Hiring Full Stack AI Engineer at our Bangalore office. MCA freshers encouraged.
+,,,
+# Notes:,,,
+# - name: required,,,
+# - email: required,,,
+# - role: optional (default: Python/Django Developer),,,
+# - post_text: optional; if blank a generic body is used,,,
