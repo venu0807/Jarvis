@@ -73,11 +73,11 @@ def fetch_amazon_bestsellers(category_url: str, max_items: int = 10) -> list:
 
 
 def fetch_trending_students() -> list:
-    """Fetch trending student products from Amazon Best Sellers (student niche)."""
+    """Fetch trending products from Amazon Best Sellers (High Converting Pinterest Niches)."""
     categories = [
+        ("home_decor", "https://www.amazon.com/Best-Sellers-Home-Kitchen/zgbs/home-garden/"),
+        ("beauty", "https://www.amazon.com/Best-Sellers-Beauty/zgbs/beauty/"),
         ("tech", "https://www.amazon.com/Best-Sellers-Electronics/zgbs/electronics/"),
-        ("dorm_decor", "https://www.amazon.com/Best-Sellers-Home-Kitchen/zgbs/home-garden/"),
-        ("study_supplies", "https://www.amazon.com/Best-Sellers-Office-Products/zgbs/office-products/"),
     ]
 
     all_products = []

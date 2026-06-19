@@ -329,7 +329,7 @@ def refill_trending():
         if name not in existing_names:
             from products import get_affiliate_link, get_image_url
             link = get_affiliate_link(tp["asin"], AMAZON_TAG)
-            img_url = get_image_url("", category=tp.get("category", "tech"))
+            img_url = get_image_url(tp["asin"], category=tp.get("category", "tech"))
             new_rows.append({
                 "Product Name": tp["name"],
                 "Image URL": img_url,
@@ -427,6 +427,7 @@ def run_automation(max_pins: int = None, category: str = None):
         pin_type = str(row.get("Pin Type", "product"))
         content_lines_raw = str(row.get("Content Lines", ""))
         pin_template = str(row.get("Pin_Template", "")).strip()
+        board_name = str(row.get("Board", "")).strip()
 
         print(f"\n{'─' * 50}")
         print(f"  [{idx + 1}/{len(target_indices)}] {post_title[:70]}")
@@ -434,7 +435,7 @@ def run_automation(max_pins: int = None, category: str = None):
         print(f"{'─' * 50}")
 
         # Generate pin image (uses SEO title for the design text)
-        output_file = f"pin_{csv_idx}.jpg"
+        output_file = f"pin_{csv_idx}.png"
         try:
             # Determine if this is a content pin (text-only) or product pin
             is_content = pin_type.strip().lower() == "content" or not img_url
@@ -468,10 +469,12 @@ def run_automation(max_pins: int = None, category: str = None):
             failed_count += 1
             continue
 
-        # Post pin (API → browser fallback) — uses SEO title for max CTR
         success = post_pin(
-            local_img, post_title, aff_link,
-            description=description
+            image_path=local_img, 
+            title=post_title, 
+            link=aff_link,
+            description=description,
+            board_name=board_name if board_name else None
         )
 
         if success:

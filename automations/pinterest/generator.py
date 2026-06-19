@@ -8,6 +8,7 @@ product pins get more click-throughs. We alternate for best results.
 """
 
 import os
+import re
 import random
 import textwrap
 from io import BytesIO
@@ -329,172 +330,92 @@ def _pick_hook(tags: str = None, title: str = None, price: str = None) -> str:
 def generate_product_pin(product_name: str, image_url: str, output_filename: str,
                          price: str = None, tags: str = None,
                          hook: str = None) -> str:
-    """Create a product pin: aesthetic bg + product image overlay + text.
+    """Create a sleek modern product pin with a full-bleed image and dark gradient overlay."""
+    print(f"  🎨 Generating sleek product pin: {product_name[:40]}...")
 
-    Includes Quick Wins:
-    - Bigger bold title (62pt + button-style price pill)
-    - Hook phrase at very top (e.g. "I saved $200…")
-    - Social proof strip ("⭐ 4.8/5 · 12k bought")
-    - Bottom CTA strip ("Save for later 👇 Tap to shop")
-    - Warm pastel palette (cream/blush/coral, not dark)
-    """
-    print(f"  🎨 Generating product pin: {product_name[:40]}...")
-
-    # 1. Download product image
     try:
-        resp = requests.get(image_url, timeout=15)
+        high_res_url = re.sub(r'\._.*_\.(jpg|png)$', r'.\1', image_url, flags=re.IGNORECASE) if image_url else image_url
+        resp = requests.get(high_res_url, timeout=15)
+        if resp.status_code == 404 and high_res_url != image_url:
+            resp = requests.get(image_url, timeout=15)
         resp.raise_for_status()
         product_img = Image.open(BytesIO(resp.content)).convert("RGBA")
     except Exception as e:
         print(f"  ⚠️  Failed to download product image: {e}")
-        # Fallback: text-only card for this product
-        return generate_content_pin(
-            title=product_name,
-            lines=[product_name[:30], "", "Click to shop!"],
-            output_filename=output_filename,
-            subtitle=price
-        )
+        return generate_content_pin(title=product_name, lines=[product_name[:30]], output_filename=output_filename, subtitle="Check it out →")
 
-    # 2. Resize product image
-    product_img.thumbnail((750, 750), Image.Resampling.LANCZOS)
+    canvas_w, canvas_h = 1000, 1500
+    final = Image.new("RGBA", (canvas_w, canvas_h), (255, 255, 255, 255))
 
-    # 3. Load background
-    bg = _load_background()
-
-    # 4. Paste product image centered, slightly above middle
-    bg_w, bg_h = bg.size
+    target_size = 900
+    product_img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
     p_w, p_h = product_img.size
-    offset_x = (bg_w - p_w) // 2
-    offset_y = (bg_h - p_h) // 2 - 120
+    offset_x = (canvas_w - p_w) // 2
+    offset_y = max(50, (canvas_h // 2) - p_h + 100)
+    final.paste(product_img, (offset_x, offset_y), product_img)
 
-    final = Image.new("RGBA", bg.size)
-    final.paste(bg, (0, 0))
-    final.paste(product_img, (offset_x, offset_y), mask=product_img)
-
-    # 5. Add text overlay at bottom
+    overlay = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    draw_overlay = ImageDraw.Draw(overlay)
+    start_y = 700
+    for y in range(start_y, canvas_h):
+        alpha = int(((y - start_y) / (canvas_h - start_y)) * 240)
+        draw_overlay.line([(0, y), (canvas_w, y)], fill=(20, 20, 25, alpha))
+    
+    final = Image.alpha_composite(final, overlay)
     draw = ImageDraw.Draw(final)
-    _add_aesthetic_overlay(draw, bg_w, bg_h)
 
-    # ─── Quick Win #5: HOOK PHRASE at top ─────────────────────────────
-    # A short curiosity/value phrase placed above badges.
-    # Crucial — it's the FIRST thing eyeballs land on.
-    if hook is None:
-        hook = _pick_hook(tags, product_name, price)
+    try:
+        font_bold = _get_font(64)
+        font_medium = _get_font(48)
+        font_small = _get_font(36)
+    except Exception:
+        font_bold = ImageFont.load_default()
+        font_medium = font_bold
+        font_small = font_bold
 
-    if hook:
-        hook_font = _get_font(38)
-        hook_lines = textwrap.wrap(hook, width=24)[:2]
-        hook_y_start = 36
-        for hline in hook_lines:
-            bb = draw.textbbox((0, 0), hline, font=hook_font)
-            tw = bb[2] - bb[0]
-            th = bb[3] - bb[1]
-            x = (bg_w - tw) // 2
-            y = hook_y_start
+    if not hook: hook = _pick_hook(tags, product_name, price)
+    
+    # Small red pill at the top for generic category
+    pill_text = "⭐ Amazon Must-Haves"
+    hook_bb = draw.textbbox((0, 0), pill_text, font=font_small)
+    hw = hook_bb[2] - hook_bb[0]
+    hh = hook_bb[3] - hook_bb[1]
+    hx = (canvas_w - hw) // 2
+    hy = 60
+    draw.rounded_rectangle([hx - 30, hy - 15, hx + hw + 30, hy + hh + 20], radius=35, fill=(255, 60, 60, 255))
+    draw.text((hx, hy), pill_text, font=font_small, fill=(255, 255, 255, 255))
 
-            # Dark rounded pill behind hook for contrast on pastel bg
-            pad_x, pad_y = 22, 12
-            bx0, by0 = x - pad_x, y - pad_y
-            bx1, by1 = x + tw + pad_x, y + th + pad_y
-            draw.rounded_rectangle([bx0, by0, bx1, by1], radius=24,
-                                   fill=(20, 20, 25, 215))
-            # Hook text in white
-            draw.text((x, y), hline, font=hook_font, fill=(255, 255, 255, 255))
-            hook_y_start = by1 + 12
-
-        # Track where hooks ended so badges go below
-        badge_top = hook_y_start + 6
-    else:
-        badge_top = 60
-
-    # 🏷️ BADGES at top (high CTR - social proof & urgency)
-    badges = _detect_badges_from_tags(tags, product_name)
-    badge_y = badge_top
-    for badge_key in badges:
-        badge_y = _draw_badge(draw, bg_w // 2, badge_y, badge_key, font_size=26)
-
-    # Product name (BIGGER & BOLDER — quick win)
-    font_title = _get_font(62)
-    lines = textwrap.wrap(product_name, width=18)
-
-    # Reserve space for CTA strip at the bottom (last 90 pixels)
-    CTA_BOTTOM_RESERVE = 90
-
-    y = bg_h - 380 if price else bg_h - 310
-    if y > bg_h - CTA_BOTTOM_RESERVE - 200:
-        y = bg_h - CTA_BOTTOM_RESERVE - 200
-
-    for line in lines[:3]:  # max 3 lines
-        bb = draw.textbbox((0, 0), line, font=font_title)
+    # Use the hook as the MAIN giant text on the image
+    lines = textwrap.wrap(hook, width=20)[:4]
+    # Calculate starting Y based on number of lines to keep it centered above the button
+    total_text_height = len(lines) * 80
+    y = 1000 - total_text_height
+    
+    for line in lines:
+        bb = draw.textbbox((0, 0), line, font=font_bold)
         tw = bb[2] - bb[0]
-        th = bb[3] - bb[1]
-        x = (bg_w - tw) // 2
-        # Stronger drop shadow for pop
-        draw.text((x + 3, y + 3), line, font=font_title, fill=(0, 0, 0, 160))
-        draw.text((x, y), line, font=font_title, fill=(255, 255, 255, 255))
-        y += th + 10
+        x = (canvas_w - tw) // 2
+        draw.text((x, y), line, font=font_bold, fill=(255, 255, 255, 255))
+        y += 85
 
-    # ─── Quick Win #4: SOCIAL PROOF strip (⭐ 4.8/5 · 12k bought) ───
-    social_y = bg_h - CTA_BOTTOM_RESERVE - 70
-    social_font = _get_font(28)
-    social_text = "⭐ 4.8/5   ·   12k+ bought this month"
-    bb = draw.textbbox((0, 0), social_text, font=social_font)
-    tw = bb[2] - bb[0]
-    th = bb[3] - bb[1]
-    sx = (bg_w - tw) // 2
-    draw.rounded_rectangle(
-        [sx - 18, social_y - 8, sx + tw + 18, social_y + th + 12],
-        radius=18, fill=(255, 255, 255, 190)
-    )
-    draw.text((sx, social_y + 2), social_text, font=social_font,
-              fill=(60, 40, 50, 255))
+    rating_text = "★★★★★ 4.8/5 (12k+ reviews)"
+    if price: rating_text += f"  •  {price}"
+    r_bb = draw.textbbox((0, 0), rating_text, font=font_small)
+    rw = r_bb[2] - r_bb[0]
+    rx = (canvas_w - rw) // 2
+    draw.text((rx, y + 10), rating_text, font=font_small, fill=(255, 215, 0, 255))
 
-    # Price tag (if provided) — placed AFTER social proof so price is the
-    # last thing the eye sees right above the CTA
-    if price:
-        font_price = _get_font(56)  # Larger
-        price_text = f"💰 {price}"
-        bb = draw.textbbox((0, 0), price_text, font=font_price)
-        tw = bb[2] - bb[0]
-        th = bb[3] - bb[1]
-        x = (bg_w - tw) // 2
-        # Place price above CTA strip
-        y = bg_h - CTA_BOTTOM_RESERVE - 22
+    btn_w, btn_h = 450, 100
+    btn_x = (canvas_w - btn_w) // 2
+    btn_y = 1320
+    draw.rounded_rectangle([btn_x, btn_y, btn_x+btn_w, btn_y+btn_h], radius=50, fill=(255, 255, 255, 255))
+    
+    cta_text = "Tap to Shop"
+    c_bb = draw.textbbox((0, 0), cta_text, font=font_medium)
+    cw = c_bb[2] - c_bb[0]
+    ch = c_bb[3] - c_bb[1]
+    draw.text((btn_x + (btn_w - cw) // 2, btn_y + (btn_h - ch) // 2 - 5), cta_text, font=font_medium, fill=(0, 0, 0, 255))
 
-        pill_w = tw + 50
-        pill_h = th + 24
-        pill_x = (bg_w - pill_w) // 2
-
-        draw.rounded_rectangle(
-            [pill_x, y - 12, pill_x + pill_w, y + pill_h - 12],
-            radius=25, fill=(255, 215, 0, 235)
-        )
-        draw.rounded_rectangle(
-            [pill_x + 2, y - 10, pill_x + pill_w - 2, y + pill_h - 14],
-            radius=23, fill=(255, 235, 80, 110)
-        )
-        draw.text((x + 2, y + 2), price_text, font=font_price,
-                  fill=(40, 30, 0, 220))
-        draw.text((x, y), price_text, font=font_price,
-                  fill=(255, 255, 255, 255))
-
-    # ─── Quick Win #3: CTA strip at very bottom ─────────────────────
-    # Dark contrasting band with arrow — tells viewers what to do.
-    cta_font = _get_font(34)
-    cta_text = "💖  Save this pin · Tap to shop  ➜"
-    bb = draw.textbbox((0, 0), cta_text, font=cta_font)
-    tw = bb[2] - bb[0]
-    th = bb[3] - bb[1]
-    cx = (bg_w - tw) // 2
-    cy = bg_h - CTA_BOTTOM_RESERVE + 22
-
-    # Full-width dark band
-    draw.rectangle([0, bg_h - CTA_BOTTOM_RESERVE, bg_w, bg_h],
-                   fill=(30, 25, 35, 245))
-    # CTA text in bright white
-    draw.text((cx, cy), cta_text, font=cta_font, fill=(255, 255, 255, 255))
-
-    # Save
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     output_path = os.path.join(OUTPUT_DIR, output_filename)
     final.convert("RGB").save(output_path, "JPEG", quality=95)
@@ -592,8 +513,71 @@ def generate_content_pin(title: str, lines: list, output_filename: str,
     # Save
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     output_path = os.path.join(OUTPUT_DIR, output_filename)
-    final.convert("RGB").save(output_path, "JPEG", quality=95)
+    if output_filename.lower().endswith('.png'):
+        final.convert("RGBA").save(output_path, "PNG")
+    else:
+        final.convert("RGB").save(output_path, "JPEG", quality=100)
     print(f"  ✅ Content pin saved: {output_path}")
+    return output_path
+
+
+def generate_closeup_pin(product_name: str, image_url: str, output_filename: str, price: str = None, tags: str = None) -> str:
+    """Create a macro close-up product pin with direct feature bullets."""
+    print(f"  📸 Generating closeup pin: {product_name[:40]}...")
+
+    try:
+        high_res_url = re.sub(r'\._.*_\.(jpg|png)$', r'.\1', image_url, flags=re.IGNORECASE) if image_url else image_url
+        import requests
+        from io import BytesIO
+        resp = requests.get(high_res_url, timeout=15)
+        if resp.status_code == 404 and high_res_url != image_url:
+            resp = requests.get(image_url, timeout=15)
+        resp.raise_for_status()
+        product_img = Image.open(BytesIO(resp.content)).convert("RGBA")
+    except Exception as e:
+        print(f"  ⚠️  Failed to download product image: {e}")
+        return generate_product_pin(product_name, image_url, output_filename, price, tags)
+
+    canvas_w, canvas_h = 1000, 1500
+    final = Image.new("RGBA", (canvas_w, canvas_h), (255, 255, 255, 255))
+    
+    product_img.thumbnail((1400, 1400), Image.Resampling.LANCZOS)
+    cx = (canvas_w - product_img.size[0]) // 2
+    cy = 0
+    final.paste(product_img, (cx, cy), product_img)
+    
+    overlay = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    draw_overlay = ImageDraw.Draw(overlay)
+    for y in range(1100, canvas_h):
+        alpha = int(((y - 1100) / (canvas_h - 1100)) * 240)
+        draw_overlay.line([(0, y), (canvas_w, y)], fill=(15, 15, 20, alpha))
+    final = Image.alpha_composite(final, overlay)
+    
+    draw = ImageDraw.Draw(final)
+    try:
+        font_bold = _get_font(60)
+        font_medium = _get_font(45)
+    except Exception:
+        font_bold = ImageFont.load_default()
+        font_medium = ImageFont.load_default()
+    
+    import textwrap
+    short_title = textwrap.wrap(product_name, width=28)[0] if product_name else "Amazon Find"
+    bb = draw.textbbox((0, 0), short_title, font=font_bold)
+    draw.text(((canvas_w - (bb[2]-bb[0]))//2, 1250), short_title, font=font_bold, fill=(255, 255, 255, 255))
+    
+    single_feature = "4.8 Rating"
+    bb = draw.textbbox((0, 0), single_feature, font=font_medium)
+    draw.text(((canvas_w - (bb[2]-bb[0]))//2, 1340), single_feature, font=font_medium, fill=(255, 215, 0, 255))
+    
+    import os
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    output_path = os.path.join(OUTPUT_DIR, output_filename)
+    if output_filename.lower().endswith('.png'):
+        final.convert("RGBA").save(output_path, "PNG")
+    else:
+        final.convert("RGB").save(output_path, "JPEG", quality=100)
+    print(f"  ✅ Closeup pin saved: {output_path}")
     return output_path
 
 
@@ -624,30 +608,6 @@ def generate_pin(product_name: str, image_url: str, output_filename: str,
         else:
             template = _auto_template_pick(price, tags)
 
-    if template == "big_number":
-        return generate_big_number_pin(
-            product_name=product_name,
-            image_url=image_url,
-            output_filename=output_filename,
-            price=price,
-            tags=tags,
-        )
-    if template == "comparison":
-        return generate_comparison_pin(
-            product_name=product_name,
-            image_url=image_url,
-            output_filename=output_filename,
-            price=price,
-            tags=tags,
-        )
-    if template == "review_quote":
-        return generate_review_quote_pin(
-            product_name=product_name,
-            image_url=image_url,
-            output_filename=output_filename,
-            price=price,
-            tags=tags,
-        )
     if template == "content" or is_content or not image_url:
         return generate_content_pin(
             title=product_name,
@@ -655,8 +615,8 @@ def generate_pin(product_name: str, image_url: str, output_filename: str,
             output_filename=output_filename,
             subtitle=tags or "Check it out →"
         )
-    # default: product overlay (image-based)
-    return generate_product_pin(
+    # OVERRIDE: Always use Macro Closeup with Feature Bullets (Option C)
+    return generate_closeup_pin(
         product_name=product_name,
         image_url=image_url,
         output_filename=output_filename,
@@ -665,8 +625,17 @@ def generate_pin(product_name: str, image_url: str, output_filename: str,
     )
 
 
-def generate_seo_title(name: str, category: str, is_trending: bool = False) -> str:
+from seo_optimizer import get_llm_seo_optimized
+
+def generate_seo_title(name: str, category: str, is_trending: bool = False, price: str = None) -> str:
     """Generate a click-worthy Pinterest SEO title."""
+    llm_title, _ = get_llm_seo_optimized(name, category, price)
+    if llm_title:
+        if is_trending:
+            return f"🔥 Trending: {llm_title}"
+        return llm_title
+
+    # Fallback
     cat_map = {
         "tech": "Tech Essentials ✨",
         "dorm_decor": "Dorm Goals 🏠",
@@ -676,7 +645,7 @@ def generate_seo_title(name: str, category: str, is_trending: bool = False) -> s
         "fashion": "Style Edit 👗",
     }
     suffix = cat_map.get(category, "Amazon Find 🔥")
-    cleaned = name.strip()
+    cleaned = name.strip()[:60]  # truncate to prevent crazy long titles
     if is_trending:
         return f"🔥 Trending Now: {cleaned} | {suffix}"
     return f"{cleaned} | {suffix}"
@@ -684,6 +653,13 @@ def generate_seo_title(name: str, category: str, is_trending: bool = False) -> s
 
 def generate_seo_description(name: str, category: str, price: str, is_trending: bool = False) -> str:
     """Generate a keyword-rich Pinterest description for SEO reach."""
+    _, llm_desc = get_llm_seo_optimized(name, category, price)
+    if llm_desc:
+        if is_trending:
+            return "[🔥 TRENDING RIGHT NOW] " + llm_desc
+        return llm_desc
+
+    # Fallback
     base_desc = (
         f"Discover why {name} is a student favorite in {category.replace('_', ' ')}. "
         f"⭐ Real reviews • 🚚 Prime shipping • 💯 Worth every penny.\n\n"
@@ -759,7 +735,10 @@ def _save_pin(final, output_filename, template_name):
     """Save a pin PNG/JPG and return path."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     output_path = os.path.join(OUTPUT_DIR, output_filename)
-    final.convert("RGB").save(output_path, "JPEG", quality=95)
+    if output_filename.lower().endswith('.png'):
+        final.convert("RGBA").save(output_path, "PNG")
+    else:
+        final.convert("RGB").save(output_path, "JPEG", quality=100)
     print(f"  ✅ [{template_name}] Pin saved: {output_path}")
     return output_path
 
@@ -769,7 +748,10 @@ def _get_product_image(image_url, max_size=(360, 360)):
     if not image_url:
         return None
     try:
-        resp = requests.get(image_url, timeout=10)
+        high_res_url = re.sub(r'\._.*_\.(jpg|png)$', r'.\1', image_url, flags=re.IGNORECASE) if image_url else image_url
+        resp = requests.get(high_res_url, timeout=10)
+        if resp.status_code == 404 and high_res_url != image_url:
+            resp = requests.get(image_url, timeout=10)
         resp.raise_for_status()
         img = Image.open(BytesIO(resp.content)).convert("RGBA")
         img.thumbnail(max_size, Image.Resampling.LANCZOS)

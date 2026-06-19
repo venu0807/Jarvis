@@ -36,9 +36,38 @@ Usage (sync — pinterest/linkedin/workday):
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+
+# Add parent directory to path to import shared_vision
+sys.path.append(str(Path(__file__) / "automations"))
+try:
+    from automations.shared_vision import solve_with_vision, solve_with_vision_async
+except ImportError:
+    # Fallback if shared_vision isn't available
+    solve_with_vision = None
+    solve_with_vision_async = None
+
+# Monkey-patch Playwright Page objects with .fallback()
+try:
+    from playwright.sync_api import Page as SyncPage
+    if solve_with_vision:
+        def _sync_fallback(self, instruction: str):
+            return solve_with_vision(self, instruction)
+        SyncPage.fallback = _sync_fallback
+except ImportError:
+    pass
+
+try:
+    from playwright.async_api import Page as AsyncPage
+    if solve_with_vision_async:
+        async def _async_fallback(self, instruction: str):
+            return await solve_with_vision_async(self, instruction)
+        AsyncPage.fallback = _async_fallback
+except ImportError:
+    pass
 
 
 # ── Browser defaults ──────────────────────────────────────────────────────────
@@ -192,6 +221,12 @@ class AsyncBrowser:
             **self._config.context_kwargs(session_path)
         )
         self._contexts.append(ctx)
+
+        # Inject stealth.min.js to bypass Akamai/Cloudflare bot protection
+        stealth_path = Path(__file__).parent / "automations" / "job-automation" / "stealth.min.js"
+        if stealth_path.exists():
+            await ctx.add_init_script(path=str(stealth_path))
+
         return ctx
 
     async def new_context_with_session(
@@ -247,15 +282,16 @@ class SyncBrowser:
     def __enter__(self):
         from playwright.sync_api import sync_playwright
 
-        self._playwright = sync_playwright().__enter__()
+        self._pw_manager = sync_playwright()
+        self._playwright = self._pw_manager.__enter__()
         return self
 
     def __exit__(self, *exc_info):
         for ctx in self._contexts:
             safe_close_sync(ctx)
         self._contexts.clear()
-        if self._playwright:
-            self._playwright.__exit__(*exc_info)
+        if self._pw_manager:
+            self._pw_manager.__exit__(*exc_info)
 
     def new_context(self, session_path: Optional[Path] = None):
         """Create a new non-persistent context."""
@@ -266,6 +302,12 @@ class SyncBrowser:
         ctx = browser.new_context(
             **self._config.context_kwargs(session_path)
         )
+
+        # Inject stealth.min.js
+        stealth_path = Path(__file__).parent / "automations" / "job-automation" / "stealth.min.js"
+        if stealth_path.exists():
+            ctx.add_init_script(path=str(stealth_path))
+
         # Track both browser and context for cleanup
         self._contexts.append(ctx)
         # We store the browser so we can close it when the context is done

@@ -60,76 +60,67 @@ def is_cache_valid(cache_entry: dict) -> bool:
 
 def fetch_amazon_image(asin: str) -> Optional[str]:
     """
-    Try to fetch a working Amazon product image URL for an ASIN.
-    Uses multiple strategies.
+    Try to fetch a working Amazon product image URL for an ASIN using Playwright.
     """
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-    }
-
-    # Strategy 1: Try Amazon's product image endpoint patterns directly with ASIN
-    patterns = [
-        f"https://m.media-amazon.com/images/I/{asin}._AC_SL1500_.jpg",
-        f"https://m.media-amazon.com/images/I/{asin}._AC_SX679_.jpg",
-        f"https://m.media-amazon.com/images/I/{asin}._AC_UL1500_.jpg",
-        f"https://m.media-amazon.com/images/I/{asin}._AC_.jpg",
-        f"https://images-na.ssl-images-amazon.com/images/I/{asin}._AC_SL1500_.jpg",
-    ]
-
-    for url in patterns:
-        try:
-            r = requests.head(url, headers=headers, timeout=5, allow_redirects=True)
-            if r.status_code == 200:
-                return url
-        except Exception:
-            continue
-
-    # Strategy 2: Try to scrape the product page for image URLs
     try:
-        product_url = f"https://www.amazon.com/dp/{asin}"
-        r = requests.get(product_url, headers=headers, timeout=10)
-        if r.status_code == 200:
-            # Look for image URLs in the HTML
-            import re
-            # Try multiple patterns
-            img_patterns = [
-                r'"hiRes"\s*:\s*"([^"]+)"',
-                r'"large"\s*:\s*"([^"]+)"',
-                r'data-a-dynamic-image\s*=\s*"([^"]+)"',
-                r'imageUrl"\s*:\s*"([^"]+)"',
-                r'https://m\.media-amazon\.com/images/I/[^"\s]+\.jpg',
-            ]
-            for pattern in img_patterns:
-                matches = re.findall(pattern, r.text)
-                for match in matches:
-                    # Clean up escaped characters
-                    clean_url = match.replace("\\u002F", "/").replace("\\/", "/")
-                    if clean_url.startswith("http") and ("jpg" in clean_url or "png" in clean_url):
-                        # Verify the URL works
-                        try:
-                            vr = requests.head(clean_url, headers=headers, timeout=5, allow_redirects=True)
-                            if vr.status_code == 200:
-                                return clean_url
-                        except Exception:
-                            continue
-    except Exception:
-        pass
+        # Import SyncBrowser dynamically to avoid circular imports if any
+        from jarvis_browser import SyncBrowser
+        with SyncBrowser(headless=True) as browser:
+            context = browser.new_context()
+            page = context.new_page()
+            
+            product_url = f"https://www.amazon.com/dp/{asin}"
+            print(f"  🌐 Navigating to {product_url}...")
+            
+            # Using domcontentloaded is faster, we just need the HTML to parse the image src
+            page.goto(product_url, timeout=30000, wait_until="domcontentloaded")
+            
+            try:
+                page.wait_for_selector("#landingImage, #imgBlkFront, .a-dynamic-image", timeout=5000)
+            except Exception:
+                pass  # Try evaluating anyway
 
-    # Strategy 3: Try Amazon's image CDN with common prefixes + ASIN suffix
-    # Many products use image IDs starting with specific prefixes
-    common_prefixes = ["71", "61", "81", "91", "51", "41", "31", "21", "11"]
-    for prefix in common_prefixes:
-        test_url = f"https://m.media-amazon.com/images/I/{prefix}{asin[-8:]}._AC_SL1500_.jpg"
-        try:
-            r = requests.head(test_url, headers=headers, timeout=3, allow_redirects=True)
-            if r.status_code == 200:
-                return test_url
-        except Exception:
-            continue
-
-    return None
+            js_extract = """
+            () => {
+                let img = document.querySelector("#landingImage, #imgBlkFront, #main-image, img.a-dynamic-image");
+                if (!img) return null;
+                
+                // 1. Try to parse data-a-dynamic-image (JSON of hi-res variants)
+                let dyn = img.getAttribute("data-a-dynamic-image");
+                if (dyn) {
+                    try {
+                        let parsed = JSON.parse(dyn);
+                        let maxW = 0;
+                        let bestUrl = null;
+                        for (let url in parsed) {
+                            if (parsed[url][0] > maxW) {
+                                maxW = parsed[url][0];
+                                bestUrl = url;
+                            }
+                        }
+                        if (bestUrl) return bestUrl;
+                    } catch(e) {}
+                }
+                
+                // 2. Try highRes attribute
+                let hiRes = img.getAttribute("data-old-hires");
+                if (hiRes) return hiRes;
+                
+                // 3. Fallback to src
+                return img.getAttribute("src");
+            }
+            """
+            
+            best_url = page.evaluate(js_extract)
+            context.close()
+            
+            if best_url and best_url.startswith("http"):
+                return best_url
+            return None
+            
+    except Exception as e:
+        print(f"  ⚠️  Playwright scraping error for {asin}: {e}")
+        return None
 
 
 def get_product_image(asin: str, category: str = "tech") -> str:

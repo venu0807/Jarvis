@@ -2,6 +2,46 @@
   "trending": {
     "products": [
       {
+        "asin": "B00E4GACB8",
+        "name": "Trending Product B00E4GACB8",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "home_decor"
+      },
+      {
+        "asin": "B01M16WBW1",
+        "name": "Trending Product B01M16WBW1",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "home_decor"
+      },
+      {
+        "asin": "B07T869RNY",
+        "name": "Trending Product B07T869RNY",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "home_decor"
+      },
+      {
+        "asin": "B09541P9WH",
+        "name": "Trending Product B09541P9WH",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "beauty"
+      },
+      {
+        "asin": "B09V7Z4TJG",
+        "name": "Trending Product B09V7Z4TJG",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "beauty"
+      },
+      {
         "asin": "B08JHCVHTY",
         "name": "Trending Product B08JHCVHTY",
         "image_id": "",
@@ -16,40 +56,8 @@
         "price": "",
         "source": "amazon_bestsellers",
         "category": "tech"
-      },
-      {
-        "asin": "B00E4GACB8",
-        "name": "Trending Product B00E4GACB8",
-        "image_id": "",
-        "price": "",
-        "source": "amazon_bestsellers",
-        "category": "dorm_decor"
-      },
-      {
-        "asin": "B01M16WBW1",
-        "name": "Trending Product B01M16WBW1",
-        "image_id": "",
-        "price": "",
-        "source": "amazon_bestsellers",
-        "category": "dorm_decor"
-      },
-      {
-        "asin": "B01FV0F8H8",
-        "name": "Trending Product B01FV0F8H8",
-        "image_id": "",
-        "price": "",
-        "source": "amazon_bestsellers",
-        "category": "study_supplies"
-      },
-      {
-        "asin": "B084131T6G",
-        "name": "Trending Product B084131T6G",
-        "image_id": "",
-        "price": "",
-        "source": "amazon_bestsellers",
-        "category": "study_supplies"
       }
     ],
-    "timestamp": 1781702341.1136851
+    "timestamp": 1781864323.2536788
   }
 }

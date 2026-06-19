@@ -450,8 +450,8 @@ class NaukriPortal(BasePortal):
         if opt:
             return opt
 
-        # Last resort: pick the first option
-        return options[0] if options else None
+        # Last resort: return None so we can trigger Vision AI fallback
+        return None
 
     async def _get_drawer_question(self, container) -> str:
         """Extract the most recent question text from the chatbot drawer."""
@@ -533,10 +533,21 @@ class NaukriPortal(BasePortal):
                     continue
 
             if apply_btn is None:
-                return ApplicationResult(job=job, status="skipped", reason="No Apply button found")
+                print("  [Vision Fallback] Attempting to click Apply using AI Vision...")
+                try:
+                    if hasattr(page, 'fallback'):
+                        await page.fallback("Click the Apply or Quick Apply button.")
+                        await page.wait_for_timeout(2500)
+                    else:
+                        return ApplicationResult(job=job, status="skipped", reason="No Apply button found")
+                except Exception as fe:
+                    print(f"  ⚠️  Vision fallback failed: {fe}")
+                    return ApplicationResult(job=job, status="skipped", reason="No Apply button found")
+            else:
+                await apply_btn.click()
+                await page.wait_for_timeout(2500)
 
-            await apply_btn.click()
-            await page.wait_for_timeout(2500)
+            # Early success check — some jobs apply directly without a form
 
             # Early success check — some jobs apply directly without a form
             try:
@@ -911,6 +922,15 @@ class NaukriPortal(BasePortal):
                                 print(f"     👉 Selecting option: '{best['text']}'")
                                 await best["locator"].click(force=True)
                                 await page.wait_for_timeout(1000)
+                            else:
+                                print(f"     🧠 Playwright unsure. Asking DOM LLM...")
+                                instruction = f"Read the question '{drawer_question}' on screen. The user has the following skills: {self.RESUME_SKILLS}. Find the best matching option and click its radio button/checkbox. If no matching option exists, return 'skip'."
+                                try:
+                                    from shared_dom_llm import solve_with_dom_async
+                                    await solve_with_dom_async(page, instruction)
+                                    await page.wait_for_timeout(1500)
+                                except Exception as fe:
+                                    print(f"     ⚠️  DOM LLM fallback failed: {fe}")
                     except Exception as eo:
                         print(f"     ⚠️ Error in options handler: {eo}")
                 except:

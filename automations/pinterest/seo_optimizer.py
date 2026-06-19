@@ -23,9 +23,66 @@ import re
 import random
 import textwrap
 from typing import Tuple, List, Optional
+import os
+import json
+import requests
 
+_llm_cache = {}
 
-# ── Keyword power bank (audience-targeted modifiers) ─────────────────────
+def get_llm_seo_optimized(raw_title: str, category: str, price: str = None) -> tuple[str, str]:
+    """Generates SMT-optimized title and description using an LLM via requests."""
+    api_key = os.getenv("NVIDIA_API_KEY")
+    if not api_key:
+        return None, None
+        
+    cache_key = f"{raw_title}_{category}_{price}"
+    if cache_key in _llm_cache:
+        return _llm_cache[cache_key]
+        
+    prompt = f"""You are an expert Pinterest SEO marketer and affiliate sales copywriter.
+Your goal is to generate a highly engaging, SMT-optimized Pinterest Title and Description for an Amazon affiliate product.
+Product Name: {raw_title}
+Category: {category}
+Price: {price or 'Not specified'}
+
+Rules:
+1. Title must be under 100 characters. Use emotional hooks and power words to drive clicks.
+2. Description must be under 500 characters. It must sound natural, highlight key benefits, include trending hashtags at the end, and end with a strong call-to-action to click the link to shop on Amazon.
+3. Reply ONLY with a valid JSON object matching exactly this schema:
+{{
+  "title": "Your optimized title here",
+  "description": "Your optimized description here"
+}}
+"""
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "meta/llama-3.1-70b-instruct",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7,
+        "max_tokens": 300
+    }
+    
+    try:
+        resp = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", headers=headers, json=payload, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+        
+        import re
+        json_match = re.search(r"\{.*\}", content, re.DOTALL)
+        if json_match:
+            parsed = json.loads(json_match.group(0))
+            _llm_cache[cache_key] = (parsed.get("title"), parsed.get("description"))
+            return _llm_cache[cache_key]
+    except Exception as e:
+        print(f"  ⚠️ LLM SEO error: {e}")
+        
+    return None, None
 
 POWER_ADVERBS = [
     "MUST-HAVE", "Best-Selling", "Top-Rated", "#1 Pick", "Editor-Tested",

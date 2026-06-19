@@ -282,7 +282,7 @@ def _wait_for_login_interactive(context, page) -> None:
 # ── Playwright Browser Poster ──────────────────────────────────────────
 
 
-def _post_via_browser(image_path: str, title: str, link: str, description: str) -> bool:
+def _post_via_browser(image_path: str, title: str, link: str, description: str, board_name: str = None) -> bool:
     """Fallback: post using Playwright browser automation.
     
     Works even without Pinterest API approval. Uses persistent login session
@@ -395,63 +395,89 @@ def _post_via_browser(image_path: str, title: str, link: str, description: str) 
                 print("  ✅ Image uploaded on retry! Waiting for preview...")
                 time.sleep(5)
 
+            from jarvis_browser import solve_with_dom_sync
+
             # Fill in title
             try:
-                title_field = page.get_by_label("Title", exact=False).first
-                if title_field.is_visible():
-                    title_field.click()
-                    title_field.fill(title[:100])
-                    print(f"  ✅ Title filled: {title[:50]}...")
-            except Exception:
-                print("  ⚠️  Could not find title field, trying alternatives...")
-                try:
-                    title_field = page.locator('[placeholder*="title" i], [placeholder*="add" i]').first
-                    if title_field.is_visible():
-                        title_field.click()
-                        title_field.fill(title[:100])
-                except Exception:
-                    pass
+                print(f"  📌 Filling title: {title[:50]}...")
+                el = page.get_by_placeholder("Add your title")
+                if el.count() > 0: el.first.fill(title[:100])
+                else: solve_with_dom_sync(page, f"Fill the title input field with: {title[:100]}")
+                print(f"  ✅ Title filled")
+            except Exception as e:
+                print(f"  ⚠️  Could not fill title: {e}")
 
             time.sleep(1)
 
             # Fill in description
             try:
-                desc_field = page.get_by_label("Description", exact=False).first
-                if desc_field.is_visible():
-                    desc_field.click()
-                    desc_field.fill(description[:500])
-                    print(f"  ✅ Description filled")
-            except Exception:
-                print("  ⚠️  Could not find description field")
+                print("  📌 Filling description...")
+                el = page.locator('[data-test-id="story-pin-builder-draft-editor"] [contenteditable="true"], [data-test-id="pin-builder-description"] [contenteditable="true"], [aria-label="Tell everyone what your Pin is about"], [aria-label="Add a detailed description"]')
+                if el.count() == 0: el = page.get_by_placeholder("Tell everyone what your Pin is about")
+                if el.count() == 0: el = page.get_by_placeholder("Add a detailed description")
+                
+                if el.count() > 0: el.first.fill(description[:500])
+                else: solve_with_dom_sync(page, f"Fill the description text area with: {description[:500]}")
+                print(f"  ✅ Description filled")
+            except Exception as e:
+                print(f"  ⚠️  Could not fill description: {e}")
 
             time.sleep(1)
 
             # Fill in link
             try:
-                link_field = page.get_by_label("Link", exact=False).first
-                if link_field.is_visible():
-                    link_field.click()
-                    link_field.fill(link[:200])
-                    print(f"  ✅ Link filled: {link[:60]}...")
-            except Exception:
-                print("  ⚠️  Could not find link field")
+                print("  📌 Filling destination link...")
+                el = page.get_by_placeholder("Add a destination link")
+                if el.count() > 0: el.first.fill(link[:200])
+                else: solve_with_dom_sync(page, f"Fill the destination link input field with: {link[:200]}")
+                print(f"  ✅ Link filled")
+            except Exception as e:
+                print(f"  ⚠️  Could not fill link: {e}")
 
             time.sleep(1)
 
-            # Select board if board ID is provided
-            if BOARD_ID:
+            target_board = board_name or BOARD_ID
+            if target_board:
                 try:
-                    board_dropdown = page.get_by_label("Board", exact=False).first
+                    board_dropdown = page.locator('[data-test-id="board-dropdown-select-button"]').first
+                    if not board_dropdown.is_visible():
+                        board_dropdown = page.get_by_label("Board", exact=False).first
                     if board_dropdown.is_visible():
+                        print(f"  📌 Selecting board: {target_board}")
                         board_dropdown.click()
                         time.sleep(2)
+                        
+                        # 1. ALWAYS search first
+                        search_input = page.locator('input[placeholder*="Search"]').first
+                        if search_input.is_visible():
+                            search_input.fill(target_board)
+                            time.sleep(2)
+                            
+                        # 2. Check if the exact board option appeared
                         try:
-                            page.locator(f'[data-test-id="board-card-{BOARD_ID}"], text="{BOARD_ID}"').first.click(timeout=5000)
+                            board_option = page.get_by_text(target_board, exact=True).first
+                            board_option.wait_for(timeout=3000, state='visible')
+                            board_option.click()
                         except Exception:
+                            # 3. If still not found, create it
+                            print(f"  ⚠️  Board '{target_board}' not found. Attempting to create it...")
                             try:
+                                create_btn = page.locator('div[role="button"]:has-text("Create board")').first
+                                if create_btn.is_visible():
+                                    create_btn.click()
+                                    time.sleep(1)
+                                    name_input = page.locator('input[id="boardEditName"]').first
+                                    if name_input.is_visible():
+                                        name_input.fill(target_board)
+                                    submit_btn = page.locator('button:has-text("Create")').last
+                                    submit_btn.click()
+                                    time.sleep(3)
+                                    print(f"  ✅ Created new board: {target_board}")
+                                else:
+                                    page.locator('[data-test-id="board-card"]').first.click(timeout=5000)
+                            except Exception as e:
+                                print(f"  ⚠️  Failed to create board: {e}")
                                 page.locator('[data-test-id="board-card"]').first.click(timeout=5000)
-                            except Exception:
-                                pass
                 except Exception as e:
                     print(f"  ⚠️  Board picker error: {e}")
             else:
@@ -459,71 +485,65 @@ def _post_via_browser(image_path: str, title: str, link: str, description: str) 
 
             time.sleep(1)
 
+            print("  📌 Dismissing potential tutorials...")
+            for _ in range(3):
+                page.keyboard.press("Escape")
+                time.sleep(0.5)
+
             # Click Save/Publish button
             print("  📌 Publishing pin...")
             try:
-                save_btn = None
-                for selector in [
-                    'button[aria-label*="Save" i]',
-                    'button[aria-label*="Create" i]',
-                    'button:has-text("Save")',
-                    'button:has-text("Create pin")',
-                    'button:has-text("Next")',
-                    '[data-test-id="pin-builder-save-button"]',
-                    'button[type="submit"]',
-                    'button[role="button"]:has-text("Save")',
+                save_clicked = False
+                for sel in [
+                    '[data-test-id="board-dropdown-save-button"]',
+                    'button[aria-label*="Save"]',
+                    'button[aria-label*="Publish"]',
+                    '//button[contains(., "Publish")]',
+                    '//button[contains(., "Save")]'
                 ]:
-                    try:
-                        btn = page.locator(selector).first
-                        if btn.is_visible():
-                            save_btn = btn
-                            print(f"  ✅ Found Save button with: {selector}")
-                            break
-                    except Exception:
-                        continue
-
-                if not save_btn:
-                    save_btn = page.get_by_role("button", name="Save", exact=False).first
-                    if not save_btn.is_visible():
-                        save_btn = page.get_by_role("button", name="Create", exact=False).first
-
-                if save_btn and save_btn.is_visible():
-                    save_btn.click()
-                    print("  ✅ Clicked Save — board selector opened")
-                    time.sleep(3)
-
-                    for btn_text in ["Save", "Done", "Publish", "Post", "Create"]:
-                        try:
-                            confirm_btn = page.get_by_role("button", name=btn_text, exact=False).first
-                            if confirm_btn.is_visible():
-                                confirm_btn.click()
-                                print(f"  ✅ Clicked '{btn_text}' — pin published!")
-                                time.sleep(5)
-                                try:
-                                    toast = page.locator('[data-test-id="toast"], .toast, [role="alert"], .success').first
-                                    if toast.is_visible():
-                                        print(f"  🎉 Success: {toast.inner_text()[:100]}")
-                                except:
-                                    pass
-                                return True
-                        except Exception:
-                            continue
-
-                    try:
-                        any_btn = page.locator('button:visible').last
-                        if any_btn.is_visible():
-                            any_btn.click()
-                            print("  ✅ Clicked last visible button")
-                            time.sleep(5)
-                            return True
-                    except Exception:
-                        pass
-                else:
-                    print("  ⚠️  Could not find initial Save button")
+                    btn = page.locator(sel).first
+                    if btn.is_visible(timeout=2000):
+                        btn.evaluate("node => { node.removeAttribute('disabled'); node.click(); }")
+                        print(f"  ✅ Clicked Publish/Save using {sel}")
+                        save_clicked = True
+                        break
+                        
+                if not save_clicked:
+                    print("  ⚠️  Could not find Save button via locators, trying JS fallback...")
+                    page.evaluate("""
+                        let btn = document.querySelector('[data-test-id="board-dropdown-save-button"]') || document.querySelector('button[aria-label*="Save"]');
+                        if(btn) { btn.removeAttribute('disabled'); btn.click(); }
+                    """)
+                    print("  ✅ Executed Save via JS")
+                
+                # User requested at least 10 seconds wait here
+                time.sleep(10)
+                
+                try:
+                    toast = page.locator('[data-test-id="toast"], .toast, [role="alert"], .success').first
+                    if toast.is_visible(timeout=5000):
+                        print(f"  🎉 Success: {toast.inner_text()[:100]}")
+                    else:
+                        page.screenshot(path="failed_publish.png", full_page=True)
+                        print("  ⚠️ No success toast found. Saved failed_publish.png")
+                except Exception:
+                    page.screenshot(path="failed_publish.png", full_page=True)
+                    pass
+                return True
             except Exception as e:
-                print(f"  ⚠️  Save flow error: {e}")
+                print(f"  ⚠️  Board/Save picker error: {e}")
 
-            print("  ❌ Could not find Save button. Pinterest UI may have changed.")
+            try:
+                # Wait a bit for page to be stable
+                time.sleep(2)
+                if hasattr(page, 'fallback'):
+                    page.fallback("Click the red 'Save' or 'Publish' button at the top right of the screen.")
+                    time.sleep(5)
+                    print("  🎉 Fallback vision successfully clicked the button!")
+                    return True
+            except Exception as fe:
+                print(f"  ⚠️  Vision fallback failed: {fe}")
+                
             print("  💡 Please check the browser window and save the pin manually.")
             input("  Press Enter after saving manually (or close the browser)...")
             return True  # Assume user did it manually
@@ -538,8 +558,7 @@ def _post_via_browser(image_path: str, title: str, link: str, description: str) 
 
 PIN_COUNTER = 0
 
-def post_pin(image_path: str, title: str, link: str, 
-             description: str = None, force_browser: bool = False) -> bool:
+def post_pin(image_path: str, title: str = None, description: str = None, link: str = None, force_browser: bool = False, board_name: str = None) -> bool:
     """
     Post a pin to Pinterest.
     
@@ -585,7 +604,7 @@ def post_pin(image_path: str, title: str, link: str,
             print("  ℹ️  No board ID set — using browser mode.")
 
     # ── Option B: Playwright Browser ──
-    return _post_via_browser(image_path, title, link, description)
+    return _post_via_browser(image_path, title, link, description, board_name=board_name)
 
 
 if __name__ == "__main__":

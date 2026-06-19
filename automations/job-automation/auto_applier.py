@@ -19,6 +19,10 @@ if sys.stdout.encoding != 'utf-8':
 if sys.stderr.encoding != 'utf-8':
     sys.stderr.reconfigure(encoding='utf-8')
 
+BASE_DIR = Path(__file__).parent
+sys.path.append(str(BASE_DIR.parent))
+sys.path.append(str(BASE_DIR.parent.parent))
+
 from dotenv import load_dotenv
 from jarvis_browser import AsyncBrowser, safe_close_async
 
