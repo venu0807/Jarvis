@@ -84,3 +84,6 @@ scratch/
 *.bak
 *.pre-reauth
 wd_browser/
+*.exe
+brain/openhuman/
+

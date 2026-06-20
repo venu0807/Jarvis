@@ -15,30 +15,22 @@ def get_dynamic_niches():
     trends = get_trending_keywords()
     niches = []
     
-    # 1. Add core static user niches mapped to existing boards to build consistency
-    core_queries = [
-        {"query": "college dorm essentials", "board": "Student Essentials", "tags": "#collegelife #dormdecor"},
-        {"query": "student tech gadgets", "board": "Student Essentials", "tags": "#studenttech #studygram"},
-        {"query": "aesthetic room decor", "board": "Aesthetic Room Decor", "tags": "#roomdecor #aesthetic"},
-        {"query": "korean skincare viral", "board": "Beauty & Vanity", "tags": "#skincare #kbeauty"},
-        {"query": "viral kitchen gadgets", "board": "Kitchen Gadgets", "tags": "#kitchenfinds #amazonkitchen"}
+    # 1. Add core static user niches mapped to specific boards
+    core_niches = [
+        {"query": "college dorm essentials", "board": "Student Essentials", "category": "student", "tags": "#collegelife #dormdecor #studentfinds"},
+        {"query": "korean skincare beauty", "board": "Beauty & Vanity", "category": "beauty", "tags": "#koreanskincare #beautyhacks #vanity"},
+        {"query": "aesthetic room decor", "board": "Aesthetic Room Decor", "category": "decor", "tags": "#roomdecor #aesthetic #roominspo"},
+        {"query": "viral kitchen gadgets", "board": "Kitchen Gadgets", "category": "kitchen", "tags": "#kitchengadgets #amazonfinds #cooking"}
     ]
-    for cq in core_queries:
-        niches.append({
-            "query": cq["query"],
-            "board": cq["board"],
-            "category": cq["board"].lower(),
-            "tags": cq["tags"]
-        })
+    for niche in core_niches:
+        niches.append(niche)
         
-    # 2. Add live Pinterest trends mapped to the 'Trending' boards
+    # 2. Add live Pinterest trends
     import random
     for t in trends:
-        # Alternate randomly between the two trending boards to build consistency
-        trending_board = random.choice(["Trending Finds", "Trending Now"])
         niches.append({
             "query": t,
-            "board": trending_board,
+            "board": random.choice(["Trending Finds", "Trending Now"]),
             "category": "trending",
             "tags": "#trending #amazonfinds #" + t.replace(' ', '')
         })
@@ -67,7 +59,7 @@ def scrape_amazon(custom_niches=None):
     
     new_products = []
     
-    with SyncBrowser(headless=True) as browser:
+    with SyncBrowser(headless=False) as browser:
         context = browser.launch_persistent(USER_DATA_DIR)
         page = context.pages[0] if context.pages else context.new_page()
         

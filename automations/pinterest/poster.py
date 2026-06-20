@@ -330,7 +330,7 @@ def _post_via_browser(image_path: str, title: str, link: str, description: str, 
         global _GLOBAL_BROWSER_MGR, _GLOBAL_CONTEXT, _GLOBAL_PAGE
         if _GLOBAL_BROWSER_MGR is None:
             print(f'  📂 Initializing Global Browser Profile: {BROWSER_USER_DATA_DIR}')
-            _GLOBAL_BROWSER_MGR = SyncBrowser(headless=True)
+            _GLOBAL_BROWSER_MGR = SyncBrowser(headless=False)
             _GLOBAL_BROWSER_MGR.__enter__()
             _GLOBAL_CONTEXT = _GLOBAL_BROWSER_MGR.launch_persistent(
                 BROWSER_USER_DATA_DIR,
@@ -355,7 +355,7 @@ def _post_via_browser(image_path: str, title: str, link: str, description: str, 
                 # Re-open persistent context for subsequent steps
                 from jarvis_browser import safe_close_sync
                 safe_close_sync(_GLOBAL_CONTEXT)
-                with SyncBrowser(headless=True) as browser_mgr2:
+                with SyncBrowser(headless=False) as browser_mgr2:
                     _GLOBAL_CONTEXT = browser_mgr2.launch_persistent(
                         BROWSER_USER_DATA_DIR,
                         extra_kwargs={"viewport": {"width": 1280, "height": 800}},

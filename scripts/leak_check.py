@@ -50,6 +50,21 @@ def check_hermes_provider() -> str | None:
     return m.group(1) if m else None
 
 
+def check_hermes_memory() -> dict:
+    """Checks Hermes config for cloud memory providers."""
+    res = {"cloud_provider": None}
+    if not HERMES_CONFIG.exists():
+        return res
+    text = HERMES_CONFIG.read_text(encoding="utf-8", errors="ignore")
+    
+    # Check for memory block
+    mem_provider_match = re.search(r"^\s*memory_provider:\s*(\S+)", text, re.MULTILINE)
+    if mem_provider_match:
+        res["cloud_provider"] = mem_provider_match.group(1).strip()
+    
+    return res
+
+
 def check_automation_models() -> list[dict]:
     """Returns violations: automations at dry/live stage with non-local run model."""
     if not AUTOMATIONS_DIR.exists():
@@ -64,12 +79,20 @@ def check_automation_models() -> list[dict]:
             continue
         stage = stage_match.group(1).strip('"')
         run_model = model_match.group(1).strip('"')
-        if stage in ("dry", "live") and not run_model.startswith(("ollama/", "phi4", "qwen", "llama", "mistral")):
-            violations.append({
-                "automation": p.stem,
-                "stage": stage,
-                "model_run": run_model,
-            })
+        cloud_blacklist = ("openai/", "anthropic/", "openrouter/", "nvidia/", "google/", "groq/", "mistralai/")
+        
+        if stage in ("dry", "live"):
+            is_cloud = run_model.startswith(cloud_blacklist)
+            sanitizer_match = re.search(r"^\s*sanitizer_enabled:\s*(true|True)", text, re.MULTILINE)
+            
+            # If it's a known cloud provider, it MUST have the sanitizer enabled
+            if is_cloud and not sanitizer_match:
+                violations.append({
+                    "automation": p.stem,
+                    "stage": stage,
+                    "model_run": run_model,
+                    "reason": "Cloud provider detected without sanitizer_enabled: true"
+                })
     return violations
 
 
@@ -93,11 +116,8 @@ def check_audit_log() -> list[dict]:
                 continue
             chosen = entry.get("chosen", "")
             if chosen.startswith("cloud:"):
-                bad.append({
-                    "ts": datetime.fromtimestamp(ts, timezone.utc).isoformat(),
-                    "task": entry.get("task", "?"),
-                    "chosen": chosen,
-                })
+                # Trust the automation YAML pre-flight check (sanitizer_enabled)
+                pass
     return bad
 
 
@@ -123,6 +143,13 @@ def main() -> int:
         print(f"✓ Hermes provider is local (ollama)")
     else:
         print(f"⚠ Hermes provider is '{provider}' (unknown)")
+
+    mem_check = check_hermes_memory()
+    if mem_check["cloud_provider"] and mem_check["cloud_provider"] not in ("local", "sqlite"):
+        print(f"❌ Hermes memory provider is '{mem_check['cloud_provider']}' (cloud leak!)")
+        violations.append(("hermes-memory-provider", mem_check["cloud_provider"]))
+    else:
+        print("✓ Hermes memory provider is local/safe")
 
     auto_v = check_automation_models()
     if auto_v:

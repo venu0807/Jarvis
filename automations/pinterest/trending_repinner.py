@@ -23,7 +23,7 @@ def repin_trending(num_pins=5):
     print(f"Selected trendy keyword for this run: '{keyword}'")
     
     try:
-        with SyncBrowser(headless=False) as browser_mgr:
+        with SyncBrowser(headless=True) as browser_mgr:
             context = browser_mgr.launch_persistent(
                 USER_DATA_DIR,
                 extra_kwargs={"viewport": {"width": 1280, "height": 800}},

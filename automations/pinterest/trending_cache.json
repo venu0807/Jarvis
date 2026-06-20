@@ -18,14 +18,6 @@
         "category": "home_decor"
       },
       {
-        "asin": "B07T869RNY",
-        "name": "Trending Product B07T869RNY",
-        "image_id": "",
-        "price": "",
-        "source": "amazon_bestsellers",
-        "category": "home_decor"
-      },
-      {
         "asin": "B09541P9WH",
         "name": "Trending Product B09541P9WH",
         "image_id": "",
@@ -58,6 +50,6 @@
         "category": "tech"
       }
     ],
-    "timestamp": 1781864323.2536788
+    "timestamp": 1781946430.3797193
   }
 }

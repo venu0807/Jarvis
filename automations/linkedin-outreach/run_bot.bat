@@ -6,9 +6,8 @@ echo ==============================================
 cd /d "D:\Proposals\Jarvis\automations\linkedin-outreach"
 
 @REM Try conda env first, fallback to system Python
-where conda >nul 2>&1
-if %errorlevel% equ 0 (
-    conda run -n linkedin-outreach python main.py
+if exist "D:\Programs\Python39\python.exe" (
+    "D:\Programs\Python39\python.exe" -u main.py
 ) else (
-    python main.py
+    python -u main.py
 )

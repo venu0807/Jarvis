@@ -1,0 +1,39 @@
+# Hybrid Openclaw Automation Template
+# This template demonstrates how to safely build locally, then deploy to 
+# cloud models (OpenRouter/Nvidia) using the PII Sanitizer for zero-leak safety.
+
+name: "Resume Analyzer (Hybrid Cloud)"
+stage: "live" # Change to 'dry' for local development
+
+# ---------------------------------------------------------
+# Security Guardrails
+# ---------------------------------------------------------
+# Required by leak_check.py if you are using a cloud model!
+sanitizer_enabled: true
+
+# ---------------------------------------------------------
+# Model Execution
+# ---------------------------------------------------------
+# For LOCAL dev:   run: "ollama/llama3"
+# For CLOUD prod:  run: "openrouter/claude-3.5-sonnet" or "nvidia/nemotron"
+run: "openrouter/claude-3.5-sonnet"
+
+# ---------------------------------------------------------
+# Prompt & Instructions
+# ---------------------------------------------------------
+system_prompt: |
+  You are an expert technical recruiter. Analyze the provided resume text 
+  and extract the core skills, ignoring any personal information.
+  Respond in strict JSON format.
+
+# ---------------------------------------------------------
+# Pipeline Logic
+# ---------------------------------------------------------
+# In your Python execution script (e.g., run_pipeline.py), ensure you pass 
+# the inputs through the sanitizer BEFORE calling the Openclaw execution:
+#
+# from scripts.sanitizer import SanitizerMiddleware
+# sanitizer = SanitizerMiddleware()
+# safe_resume_text = sanitizer.mask_text(raw_resume_text)
+#
+# result = openclaw.execute(yaml_file="hybrid_template.yaml", inputs={"resume": safe_resume_text})
