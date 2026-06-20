@@ -9,18 +9,49 @@ CSV_FILE = "data.csv"
 USER_DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", "C:\\Users\\Venu\\AppData\\Local"), "AmazonBot")
 AFFILIATE_TAG = "venu080d-21"
 
-NICHES = [
-    {"query": "aesthetic room decor", "board": "Aesthetic Room Decor", "category": "dorm_decor", "tags": "#roomdecor #aesthetic #amazonfinds"},
-    {"query": "kitchen gadgets viral", "board": "Kitchen Gadgets", "category": "kitchen", "tags": "#kitchenhacks #aesthetic #amazonfinds"},
-    {"query": "korean skincare", "board": "Beauty & Vanity", "category": "beauty", "tags": "#skincare #kbeauty #amazonfinds"}
-]
+from get_pinterest_trends import get_trending_keywords
+
+def get_dynamic_niches():
+    trends = get_trending_keywords()
+    niches = []
+    
+    # 1. Add core static user niches mapped to existing boards to build consistency
+    core_queries = [
+        {"query": "college dorm essentials", "board": "Student Essentials", "tags": "#collegelife #dormdecor"},
+        {"query": "student tech gadgets", "board": "Student Essentials", "tags": "#studenttech #studygram"},
+        {"query": "aesthetic room decor", "board": "Aesthetic Room Decor", "tags": "#roomdecor #aesthetic"},
+        {"query": "korean skincare viral", "board": "Beauty & Vanity", "tags": "#skincare #kbeauty"},
+        {"query": "viral kitchen gadgets", "board": "Kitchen Gadgets", "tags": "#kitchenfinds #amazonkitchen"}
+    ]
+    for cq in core_queries:
+        niches.append({
+            "query": cq["query"],
+            "board": cq["board"],
+            "category": cq["board"].lower(),
+            "tags": cq["tags"]
+        })
+        
+    # 2. Add live Pinterest trends mapped to the 'Trending' boards
+    import random
+    for t in trends:
+        # Alternate randomly between the two trending boards to build consistency
+        trending_board = random.choice(["Trending Finds", "Trending Now"])
+        niches.append({
+            "query": t,
+            "board": trending_board,
+            "category": "trending",
+            "tags": "#trending #amazonfinds #" + t.replace(' ', '')
+        })
+    return niches
 
 def extract_asin(url):
     match = re.search(r'/dp/([A-Z0-9]{10})', url)
     return match.group(1) if match else None
 
-def scrape_amazon():
+def scrape_amazon(custom_niches=None):
     print("🚀 Starting Amazon Affiliate Scraper...")
+    
+    active_niches = custom_niches if custom_niches is not None else get_dynamic_niches()
     
     existing_asins = set()
     if os.path.exists(CSV_FILE):
@@ -36,11 +67,11 @@ def scrape_amazon():
     
     new_products = []
     
-    with SyncBrowser(headless=False) as browser:
+    with SyncBrowser(headless=True) as browser:
         context = browser.launch_persistent(USER_DATA_DIR)
         page = context.pages[0] if context.pages else context.new_page()
         
-        for niche in NICHES:
+        for niche in active_niches:
             print(f"\n🔍 Searching for: {niche['query']}")
             try:
                 page.goto(f"https://www.amazon.com/s?k={niche['query'].replace(' ', '+')}", wait_until="domcontentloaded", timeout=30000)

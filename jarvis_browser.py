@@ -209,7 +209,7 @@ class AsyncBrowser:
         self._contexts.clear()
         await safe_close_async(self._browser)
         if self._playwright:
-            await self._playwright.__aexit__(*exc_info)
+            await self._playwright.stop()
 
     @property
     def browser(self):
@@ -322,6 +322,7 @@ class SyncBrowser:
         """Launch a persistent context (cookies/cache survive between runs)."""
         kwargs = {
             "headless": self._config.headless,
+            "args": self._config.launch_args(),
             **self._config.context_kwargs(),
         }
         if extra_kwargs:

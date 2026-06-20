@@ -12,6 +12,7 @@ import sys
 
 PROJ_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJ_DIR))
+sys.path.insert(0, str(PROJ_DIR.parent.parent))
 
 if sys.stdout.encoding != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")

@@ -31,6 +31,8 @@ from extractor import extract_contact_info
 from composer import generate_cold_email
 from mailer import send_email
 
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from shared_utils import setup_logging
 
 # ── Paths & config ─────────────────────────────────────────────────────────────

@@ -13,6 +13,9 @@ Fixes applied:
 import os
 import random
 import urllib.parse
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from jarvis_browser import SyncBrowser
 
 TIMEOUT_MS = 60_000

@@ -249,26 +249,6 @@ def refill_csv_trending():
                 existing_names.add(name)
                 added += 1
 
-    # Add content pins (text-based tips)
-    for cp in CONTENT_PINS:
-        title = cp["title"].strip().lower()
-        if title not in existing_names:
-            link = f"https://www.amazon.com/s?k={'+'.join(cp['title'].split()[:5])}&tag={AMAZON_TAG}"
-            new_rows.append({
-                "Product Name": cp["title"],
-                "Image URL": "",
-                "Affiliate Link": link,
-                "Status": "",
-                "Category": cp["category"],
-                "Price": "",
-                "Tags": cp.get("tags", ""),
-                "Description": cp.get("description", ""),
-                "Pin Type": "content",
-                "Content Lines": "|".join(cp["lines"])
-            })
-            existing_names.add(title)
-            added += 1
-
     if added == 0:
         print("  ✅ No new products to add — CSV is up to date!")
         return
@@ -307,56 +287,13 @@ def refill_trending():
     print("\n  🔥 Fetching LIVE TRENDING products from Amazon...")
     trending = get_trending_products(force_refresh=True)
 
-    if not trending:
-        print("  ⚠️  No trending products found — falling back to static database")
-        refill_csv()
-        return
+    print("\n=====================================")
+    print("   REFILLING FROM DYNAMIC TRENDS     ")
+    print("=====================================")
+    from amazon_scraper import scrape_amazon
+    scrape_amazon()
+    print("✅ Successfully filled CSV with dynamic Pinterest trends from Amazon!")
 
-    print(f"  ✅ Found {len(trending)} trending products")
-
-    # Load existing CSV
-    existing_names = set()
-    if os.path.exists(CSV_FILE):
-        df_existing = pd.read_csv(CSV_FILE)
-        existing_names = set(df_existing["Product Name"].str.strip().str.lower())
-        print(f"  📋 {len(df_existing)} existing products in CSV")
-
-    # Add trending products
-    new_rows = []
-    added = 0
-    for tp in trending:
-        name = tp["name"].strip().lower()
-        if name not in existing_names:
-            from products import get_affiliate_link, get_image_url
-            link = get_affiliate_link(tp["asin"], AMAZON_TAG)
-            img_url = get_image_url(tp["asin"], category=tp.get("category", "tech"))
-            new_rows.append({
-                "Product Name": tp["name"],
-                "Image URL": img_url,
-                "Affiliate Link": link,
-                "Status": "",
-                "Category": tp.get("category", "tech"),
-                "Price": tp.get("price", ""),
-                "Tags": "#trending #amazonfinds #collegeessentials",
-                "Description": f"Currently trending on Amazon! {tp['name'][:80]}",
-                "Pin Type": "product"
-            })
-            existing_names.add(name)
-            added += 1
-
-    if added == 0:
-        print("  ✅ All trending products already in CSV")
-        return
-
-    # Append to CSV
-    new_df = pd.DataFrame(new_rows)
-    if os.path.exists(CSV_FILE):
-        combined = pd.concat([df_existing, new_df], ignore_index=True)
-        combined.to_csv(CSV_FILE, index=False)
-    else:
-        new_df.to_csv(CSV_FILE, index=False)
-
-    print(f"  ✅ Added {added} trending products to {CSV_FILE}!")
 
 
 # ── Run Automation ──────────────────────────────────────────────────────
@@ -374,13 +311,19 @@ def run_automation(max_pins: int = None, category: str = None):
     print("   Using API v5 → Browser fallback")
     print("=" * 55)
 
+    print("\n  🔄 Auto-refilling database before posting...")
+    try:
+        refill_trending()
+    except Exception as e:
+        print(f"  ⚠️ Auto-refill failed: {e}")
+
     # Check CSV exists
     if not os.path.exists(CSV_FILE):
         print(f"\n  ❌ {CSV_FILE} not found!")
         print("  💡 Run 'python main.py refill' to populate it first!")
         return
 
-    df = pd.read_csv(CSV_FILE, dtype={"Status": str})
+    df = pd.read_csv(CSV_FILE, dtype=str).fillna("")
     total = len(df)
 
     # Find pending pins
@@ -404,93 +347,98 @@ def run_automation(max_pins: int = None, category: str = None):
     failed_count = 0
     start_time = time.time()
 
-    for idx, csv_idx in enumerate(target_indices):
-        row = df.loc[csv_idx]
-        title = row["Product Name"]
-        # Use SEO Title if present, otherwise auto-generate one
-        seo_title = str(row.get("SEO Title", "")).strip()
-        category = str(row.get("Category", "")).strip()
-        is_trending_row = (csv_idx >= len(df) - 6)  # last 6 = trending
+    try:
+        for idx, csv_idx in enumerate(target_indices):
+            row = df.loc[csv_idx]
+            title = row["Product Name"]
+            # Use SEO Title if present, otherwise auto-generate one
+            seo_title = str(row.get("SEO Title", "")).strip()
+            category = str(row.get("Category", "")).strip()
+            is_trending_row = (csv_idx >= len(df) - 6)  # last 6 = trending
 
-        if seo_title:
-            post_title = seo_title
-        else:
-            try:
-                post_title = generate_seo_title(title, category, is_trending=is_trending_row)
-            except Exception:
-                post_title = title
-        img_url = str(row.get("Image URL", ""))
-        aff_link = str(row.get("Affiliate Link", ""))
-        price = str(row.get("Price", ""))
-        tags = str(row.get("Tags", ""))
-        description = str(row.get("Description", ""))
-        pin_type = str(row.get("Pin Type", "product"))
-        content_lines_raw = str(row.get("Content Lines", ""))
-        pin_template = str(row.get("Pin_Template", "")).strip()
-        board_name = str(row.get("Board", "")).strip()
-
-        print(f"\n{'─' * 50}")
-        print(f"  [{idx + 1}/{len(target_indices)}] {post_title[:70]}")
-        print(f"  📐 Template: {pin_template or 'auto'}")
-        print(f"{'─' * 50}")
-
-        # Generate pin image (uses SEO title for the design text)
-        output_file = f"pin_{csv_idx}.png"
-        try:
-            # Determine if this is a content pin (text-only) or product pin
-            is_content = pin_type.strip().lower() == "content" or not img_url
-
-            if is_content:
-                # Content pin — split lines by pipe separator (stored in CSV)
-                lines = [l.strip() for l in content_lines_raw.split("|") if l.strip()] if content_lines_raw else None
-                if not lines:
-                    # Use title as the only text if no lines available
-                    lines = [post_title[:30]]
-                local_img = generate_pin(
-                    post_title, "", output_file,
-                    is_content=True, lines=lines,
-                    tags=tags,
-                    template=pin_template or None,
-                )
+            if seo_title:
+                post_title = seo_title
             else:
-                # Product pin — use image URL
-                local_img = generate_pin(
-                    post_title, img_url, output_file,
-                    price=price, tags=tags,
-                    template=pin_template or None,
-                )
-        except Exception as e:
-            print(f"  ❌ Image generation failed: {e}")
-            failed_count += 1
-            continue
+                try:
+                    post_title = generate_seo_title(title, category, is_trending=is_trending_row)
+                except Exception:
+                    post_title = title
+            img_url = str(row.get("Image URL", ""))
+            aff_link = str(row.get("Affiliate Link", ""))
+            price = str(row.get("Price", ""))
+            tags = str(row.get("Tags", ""))
+            description = str(row.get("Description", ""))
+            pin_type = str(row.get("Pin Type", "product"))
+            content_lines_raw = str(row.get("Content Lines", ""))
+            pin_template = str(row.get("Pin_Template", "")).strip()
+            board_name = str(row.get("Board", "")).strip()
 
-        if not local_img or not os.path.exists(local_img):
-            print(f"  ⚠️  Image not generated — skipping pin")
-            failed_count += 1
-            continue
+            print(f"\n{'─' * 50}")
+            print(f"  [{idx + 1}/{len(target_indices)}] {post_title[:70]}")
+            print(f"  📐 Template: {pin_template or 'auto'}")
+            print(f"{'─' * 50}")
 
-        success = post_pin(
-            image_path=local_img, 
-            title=post_title, 
-            link=aff_link,
-            description=description,
-            board_name=board_name if board_name else None
-        )
+            # Generate pin image (uses SEO title for the design text)
+            output_file = f"pin_{csv_idx}.png"
+            try:
+                # Determine if this is a content pin (text-only) or product pin
+                is_content = pin_type.strip().lower() == "content" or not img_url
 
-        if success:
-            df.at[csv_idx, "Status"] = "Pinned"
-            df.to_csv(CSV_FILE, index=False)
-            print(f"  ✅ CSV updated")
-            pinned_count += 1
-        else:
-            print(f"  ❌ Failed to post '{title}'")
-            failed_count += 1
+                if is_content:
+                    # Content pin — split lines by pipe separator (stored in CSV)
+                    lines = [l.strip() for l in content_lines_raw.split("|") if l.strip()] if content_lines_raw else None
+                    if not lines:
+                        # Use title as the only text if no lines available
+                        lines = [post_title[:30]]
+                    local_img = generate_pin(
+                        post_title, "", output_file,
+                        is_content=True, lines=lines,
+                        tags=tags,
+                        template=pin_template or None,
+                    )
+                else:
+                    # Product pin — use image URL
+                    local_img = generate_pin(
+                        post_title, img_url, output_file,
+                        price=price, tags=tags,
+                        template=pin_template or None,
+                    )
+            except Exception as e:
+                print(f"  ❌ Image generation failed: {e}")
+                failed_count += 1
+                continue
 
-        # Pause between pins (but not after the last one)
-        if idx < len(target_indices) - 1:
-            delay = SLEEP_BETWEEN_PINS + random.uniform(-2, 3)
-            print(f"  ⏳ Waiting {delay:.0f}s before next pin...")
-            time.sleep(delay)
+            if not local_img or not os.path.exists(local_img):
+                print(f"  ⚠️  Image not generated — skipping pin")
+                failed_count += 1
+                continue
+
+            success = post_pin(
+                image_path=local_img, 
+                title=post_title, 
+                link=aff_link,
+                description=description,
+                board_name=board_name if board_name else None
+            )
+
+            if success:
+                df.at[csv_idx, "Status"] = "Pinned"
+                df.to_csv(CSV_FILE, index=False)
+                print(f"  ✅ CSV updated")
+                pinned_count += 1
+            else:
+                print(f"  ❌ Failed to post '{title}'")
+                failed_count += 1
+
+            # Pause between pins (but not after the last one)
+            if idx < len(target_indices) - 1:
+                delay = SLEEP_BETWEEN_PINS + random.uniform(-2, 3)
+                print(f"  ⏳ Waiting {delay:.0f}s before next pin...")
+                time.sleep(delay)
+    finally:
+        # Cleanup browser
+        from poster import cleanup_browser
+        cleanup_browser()
 
     # ── Run Summary ──
     elapsed = time.time() - start_time
@@ -515,7 +463,6 @@ def run_automation(max_pins: int = None, category: str = None):
     if pinned_count > 0:
         print(f"  💰 TIP: Run this daily to see real results!")
         print(f"      python main.py\n")
-
 
 # ── Schedule Mode ───────────────────────────────────────────────────────
 

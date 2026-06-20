@@ -20,6 +20,7 @@ from pathlib import Path
 # Project root = parent of scripts/
 PROJ_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJ_DIR))
+sys.path.insert(0, str(PROJ_DIR.parent.parent))
 
 # UTF-8 for Windows console
 if sys.stdout.encoding != "utf-8":
