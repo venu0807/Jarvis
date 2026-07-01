@@ -103,9 +103,9 @@ class BrowserConfig:
     def launch_args(self) -> list:
         """Combine standard args with mode-specific args and any extras."""
         args = list(BROWSER_LAUNCH_ARGS)
-        # Push headful window off-screen so it only shows in the taskbar
+        # Push browser way off-screen to taskbar so it doesn't annoy user
         if not self.headless:
-            args.append("--window-position=0,2000")
+            args.append("--window-position=-32000,-32000")
         args.extend(self.extra_args)
         return args
 
@@ -314,6 +314,18 @@ class SyncBrowser:
         }
         if extra_kwargs:
             kwargs.update(extra_kwargs)
+            
+        import os
+        if os.path.exists('/usr/bin/google-chrome'):
+            kwargs['executable_path'] = '/usr/bin/google-chrome'
+            
+        if not self._config.headless:
+            if 'args' not in kwargs:
+                kwargs['args'] = []
+            # Fix WSLg hidden window bug by forcing it to maximize and removing Playwright's forced viewport
+            kwargs['args'].append('--start-maximized')
+            kwargs['no_viewport'] = True
+            
         ctx = self._playwright.chromium.launch_persistent_context(
             user_data_dir=str(user_data_dir),
             **kwargs,

@@ -41,7 +41,7 @@ dirs_to_delete = [
     "automations/interview_scheduler_prep_bot"
 ]
 
-base_dir = r"D:\Proposals\Jarvis"
+base_dir = os.path.dirname(os.path.abspath(__file__))
 
 for f in files_to_delete:
     path = os.path.join(base_dir, f)

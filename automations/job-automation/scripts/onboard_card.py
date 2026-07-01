@@ -69,14 +69,14 @@ Every 30m 📧  Recruiter reply detector     (auto-moves pipeline)
 ═══════════════════════════════════════════════
 🛠 _FROM YOUR PC_ (one-terminal commands)
 ═══════════════════════════════════════════════
-cd D:\Proposals\Jarvis\automations\job-automation
+cd ~/Proposals/Jarvis/automations/job-automation
 
-python scripts\headful_reauth.py             # Refresh ALL session cookies (browser opens, you solve CAPTCHA)
-python scripts\headful_reauth.py --only indeed,internshala
-python scripts\headful_reauth.py --skip cutshort,freshersworld
+python scripts/headful_reauth.py             # Refresh ALL session cookies (browser opens, you solve CAPTCHA)
+python scripts/headful_reauth.py --only indeed,internshala
+python scripts/headful_reauth.py --skip cutshort,freshersworld
 python validate_sessions.py                   # Read-only cookie health
-python scripts\weekly_compare.py             # Pre vs post portal stats
-python scripts\onboard_card.py --print       # Re-print this card
+python scripts/weekly_compare.py             # Pre vs post portal stats
+python scripts/onboard_card.py --print       # Re-print this card
 python auto_applier.py --portal career_pages # Aggregator auto-apply: Greenhouse/Lever/Ashby/Recruitee
 python run_pipeline.py                       # Full pipeline (apply + tailor + email)
 
@@ -92,7 +92,7 @@ python run_pipeline.py                       # Full pipeline (apply + tailor + e
 ═══════════════════════════════════════════════
 🛡 _SAFEGUARD AI_ (Android project, run on PC)
 ═══════════════════════════════════════════════
-python D:/Proposals/SafeguardAI/__check__.py  # Pre-demo health check
+python ~/Proposals/SafeguardAI/__check__.py  # Pre-demo health check
 """
 
 

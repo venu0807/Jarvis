@@ -82,10 +82,31 @@ def fetch_amazon_image(asin: str) -> Optional[str]:
 
             js_extract = """
             () => {
+                // Grab all alternate image thumbnails
+                let altImages = Array.from(document.querySelectorAll("#altImages img, .a-button-thumbnail img"));
+                let urls = [];
+                for (let img of altImages) {
+                    let src = img.getAttribute("src");
+                    if (src && !src.includes("play-button") && !src.includes("transparent")) {
+                        // Convert thumbnail url to raw high-res original url
+                        let hiRes = src.replace(/\._.*_\./, ".");
+                        urls.push(hiRes);
+                    }
+                }
+                
+                let uniqueUrls = [...new Set(urls)];
+                
+                // Usually the 1st image is plain white background. 
+                // We pick a random one from the rest (lifestyle/context shots)
+                if (uniqueUrls.length > 1) {
+                    let randomIndex = Math.floor(Math.random() * (uniqueUrls.length - 1)) + 1;
+                    return uniqueUrls[randomIndex];
+                }
+
+                // --- Fallback to original main image logic if no alt images ---
                 let img = document.querySelector("#landingImage, #imgBlkFront, #main-image, img.a-dynamic-image");
                 if (!img) return null;
                 
-                // 1. Try to parse data-a-dynamic-image (JSON of hi-res variants)
                 let dyn = img.getAttribute("data-a-dynamic-image");
                 if (dyn) {
                     try {
@@ -102,11 +123,9 @@ def fetch_amazon_image(asin: str) -> Optional[str]:
                     } catch(e) {}
                 }
                 
-                // 2. Try highRes attribute
                 let hiRes = img.getAttribute("data-old-hires");
                 if (hiRes) return hiRes;
                 
-                // 3. Fallback to src
                 return img.getAttribute("src");
             }
             """

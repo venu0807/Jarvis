@@ -16,7 +16,8 @@ from image_fetcher import get_product_image, get_content_pin_image
 
 # ── Categories ──────────────────────────────────────────────────────────
 CATEGORIES = [
-    "tech", "dorm_decor", "study_supplies", "self_care", "kitchen", "fashion"
+    "tech", "dorm_decor", "study_supplies", "self_care", "kitchen", "fashion",
+    "tech_gadgets", "mens_fashion", "womens_fashion", "wellness", "cozy_home"
 ]
 
 # ── Verified Products (real ASINs & image URLs) ─────────────────────────
@@ -234,6 +235,91 @@ PRODUCTS = [
         "category": "fashion",
         "tags": "#newbalance #sneakers #campusstyle #comfortable #walkingshoes",
         "description": "Classic comfort sneakers perfect for walking across campus. Timeless style that goes with everything."
+    },
+    # ── MENS FASHION ──
+    {
+        "name": "Carhartt Men's K87 Workwear Pocket T-Shirt",
+        "asin": "B0000X121Y",
+        "image_id": "71sM549W4bL",
+        "price": "$20",
+        "category": "mens_fashion",
+        "board": "Men's Style & Fashion",
+        "tags": "#mensfashion #streetwear #carhartt #mensstyle #streetstyle",
+        "description": "The ultimate classic heavyweight pocket tee. Perfect relaxed fit for everyday streetwear or workwear. A wardrobe staple."
+    },
+    {
+        "name": "Casio Vintage Digital Watch",
+        "asin": "B000GAYQJ0",
+        "image_id": "71wV22J0pDL",
+        "price": "$22",
+        "category": "mens_fashion",
+        "board": "Men's Style & Fashion",
+        "tags": "#menswatches #vintagefashion #casio #streetwear #mensaccessories",
+        "description": "Timeless retro digital watch that goes with any outfit. Water-resistant and incredibly durable. A subtle flex."
+    },
+    # ── WOMENS FASHION ──
+    {
+        "name": "Oversized Faux Leather Shacket",
+        "asin": "B09J4Q9YJZ",
+        "image_id": "71j-o5p1TNL",
+        "price": "$45",
+        "category": "womens_fashion",
+        "board": "Women's Fashion & Outfits",
+        "tags": "#womensfashion #falloutfits #streetwear #aestheticoutfit",
+        "description": "The viral oversized leather jacket. Perfect for layering over hoodies or crop tops for an effortless model-off-duty look."
+    },
+    {
+        "name": "Chunky Gold Hoop Earrings Set",
+        "asin": "B08RHR5X81",
+        "image_id": "61P+GzH-6EL",
+        "price": "$14",
+        "category": "womens_fashion",
+        "board": "Women's Fashion & Outfits",
+        "tags": "#jewelry #goldhoops #accessories #aestheticoutfit",
+        "description": "Hypoallergenic 14K gold plated chunky hoops. Lightweight and won't tarnish. Instantly elevates any basic outfit."
+    },
+    # ── TECH GADGETS ──
+    {
+        "name": "Logitech G PRO X Superlight Wireless Gaming Mouse",
+        "asin": "B087LXCTFJ",
+        "image_id": "61Zow3Jt4bL",
+        "price": "$139",
+        "category": "tech_gadgets",
+        "board": "Tech & Gadgets",
+        "tags": "#gamingmouse #techgadgets #gamingsetup #pcgaming #logitech",
+        "description": "Ultra-lightweight wireless esports gaming mouse. Zero latency, flawless sensor. The choice of top pros."
+    },
+    {
+        "name": "Keychron K2 Wireless Mechanical Keyboard",
+        "asin": "B07Y9Y69MV",
+        "image_id": "61-R-rK4+cL",
+        "price": "$79",
+        "category": "tech_gadgets",
+        "board": "Tech & Gadgets",
+        "tags": "#mechanicalkeyboard #techgadgets #desksetup #productivity",
+        "description": "Compact 75% wireless mechanical keyboard with tactile switches. Works perfectly with Mac and Windows."
+    },
+    # ── WELLNESS ──
+    {
+        "name": "Owala FreeSip Insulated Stainless Steel Water Bottle",
+        "asin": "B0BLPCVR45",
+        "image_id": "61pZ+xYx6rL",
+        "price": "$28",
+        "category": "wellness",
+        "board": "Wellness & Self Care",
+        "tags": "#wellness #thatgirl #hydration #owala #healthylifestyle",
+        "description": "The viral Owala FreeSip. Built-in straw or wide-mouth opening. Completely leak-proof and keeps water ice cold for 24 hours."
+    },
+    # ── COZY HOME ──
+    {
+        "name": "Nespresso Vertuo Plus Coffee and Espresso Maker",
+        "asin": "B01N08BBUJ",
+        "image_id": "71C+F-Xh8fL",
+        "price": "$159",
+        "category": "cozy_home",
+        "board": "Cozy Home & Coffee",
+        "tags": "#coffee #homecafe #coffeestation #cozyhome #espresso",
+        "description": "Make barista-quality coffee and espresso at home with one touch. The perfect addition to any aesthetic home cafe setup."
     },
 ]
 

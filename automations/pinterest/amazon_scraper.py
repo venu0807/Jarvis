@@ -82,7 +82,9 @@ def scrape_amazon(custom_niches=None):
                 for link in links:
                     href = link.get_attribute("href")
                     if href and "/dp/" in href and "slredirect" not in href:
-                        raw_url = "https://www.amazon.com" + href.split('?')[0]
+                        raw_url = href.split('?')[0]
+                        if not raw_url.startswith('http'):
+                            raw_url = "https://www.amazon.com" + raw_url
                         asin = extract_asin(raw_url)
                         if asin and asin not in existing_asins:
                             valid_links.append(raw_url)

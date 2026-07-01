@@ -37,6 +37,10 @@ from __future__ import annotations
 
 import os
 import sys
+
+# Force Playwright to use the native Google Chrome instead of the broken Snap Chromium
+if os.path.exists("/usr/bin/google-chrome"):
+    os.environ["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"] = "/usr/bin/google-chrome"
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -103,9 +107,6 @@ class BrowserConfig:
     def launch_args(self) -> list:
         """Combine standard args with mode-specific args and any extras."""
         args = list(BROWSER_LAUNCH_ARGS)
-        # Push headful window off-screen so it only shows in the taskbar
-        if not self.headless:
-            args.append("--window-position=0,2000")
         args.extend(self.extra_args)
         return args
 
@@ -322,11 +323,17 @@ class SyncBrowser:
         """Launch a persistent context (cookies/cache survive between runs)."""
         kwargs = {
             "headless": self._config.headless,
-            "args": self._config.launch_args(),
             **self._config.context_kwargs(),
         }
         if extra_kwargs:
             kwargs.update(extra_kwargs)
+            
+        if not self._config.headless:
+            if 'args' not in kwargs:
+                kwargs['args'] = []
+            kwargs['args'].append('--start-maximized')
+            kwargs['no_viewport'] = True
+            
         ctx = self._playwright.chromium.launch_persistent_context(
             user_data_dir=str(user_data_dir),
             **kwargs,

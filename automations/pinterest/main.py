@@ -28,9 +28,14 @@ import pandas as pd
 from dotenv import load_dotenv
 
 load_dotenv()
+os.environ["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"] = "/usr/bin/google-chrome"
 
-from generator import generate_pin, generate_seo_title, generate_seo_description
+from generator import generate_seo_title, generate_seo_description, generate_pin
+from image_builder import generate_pinterest_pin
+from collage_builder import generate_collage_pin
+from video_builder import generate_video_pin
 from poster import post_pin
+from datetime import datetime
 from products import (
     PRODUCTS, CONTENT_PINS, get_all_categories,
     get_affiliate_link, get_image_url, get_product_count
@@ -139,7 +144,8 @@ def refill_csv():
                 "Price": p["price"],
                 "Tags": p.get("tags", ""),
                 "Description": p.get("description", ""),
-                "Pin Type": "product"
+                "Pin Type": "product",
+                "Board": p.get("board", "")
             })
             existing_names.add(name)
             added += 1
@@ -160,7 +166,8 @@ def refill_csv():
                 "Tags": cp.get("tags", ""),
                 "Description": cp.get("description", ""),
                 "Pin Type": "content",
-                "Content Lines": "|".join(cp["lines"])
+                "Content Lines": "|".join(cp["lines"]),
+                "Board": cp.get("board", "")
             })
             existing_names.add(title)
             added += 1
@@ -373,36 +380,82 @@ def run_automation(max_pins: int = None, category: str = None):
             pin_template = str(row.get("Pin_Template", "")).strip()
             board_name = str(row.get("Board", "")).strip()
 
+            if not board_name:
+                category_board_map = {
+                    "student": "College & Student Essentials",
+                    "beauty": "Viral Beauty Hacks & Skincare",
+                    "decor": "Trendy Home Decor & Apartment Ideas",
+                    "dorm_decor": "Aesthetic Dorm Decor & Organization",
+                    "kitchen": "Genius Kitchen Gadgets & Finds",
+                    "tech": "Aesthetic Desk Setup & Tech Gadgets",
+                    "tech_gadgets": "Aesthetic Desk Setup & Tech Gadgets",
+                    "womens_fashion": "Women's Fashion & Style Inspo",
+                    "mens_fashion": "Men's Fashion & Outfit Ideas",
+                    "wellness": "Wellness Routine & Self Care",
+                    "self_care": "Wellness Routine & Self Care",
+                    "cozy_home": "Cozy Home Decor Ideas"
+                }
+                board_name = category_board_map.get(category.lower(), "Trending Amazon Finds")
+
+
+            # --- Seasonal Trend Surfing ---
+            month = datetime.now().month
+            if month in [8, 9] and category in ["dorm_decor", "study_supplies"]:
+                post_title = f"Back to School: {post_title}"
+            elif month in [11, 12] and category in ["tech_gadgets", "mens_fashion", "womens_fashion", "tech"]:
+                post_title = f"Holiday Gift Guide: {post_title}"
+            elif month == 2 and category in ["womens_fashion", "self_care", "wellness"]:
+                post_title = f"Valentine's Day Gift: {post_title}"
+
+            # --- Layout --- 
+            chosen_layout = "seo_full_bleed"
+
+            # --- Format Probability ---
+            # 20% Collage, 40% Video, 40% Static
+            # User requested strictly quality static images only
+            pin_format = "static"
+
             print(f"\n{'─' * 50}")
             print(f"  [{idx + 1}/{len(target_indices)}] {post_title[:70]}")
-            print(f"  📐 Template: {pin_template or 'auto'}")
+            print(f"  📏 Format: {pin_format.upper()} | Layout: {chosen_layout.upper()}")
             print(f"{'─' * 50}")
 
-            # Generate pin image (uses SEO title for the design text)
+            # Generate pin image
             output_file = f"pin_{csv_idx}.png"
+            video_file = f"pin_{csv_idx}.mp4"
             try:
-                # Determine if this is a content pin (text-only) or product pin
                 is_content = pin_type.strip().lower() == "content" or not img_url
 
                 if is_content:
-                    # Content pin — split lines by pipe separator (stored in CSV)
                     lines = [l.strip() for l in content_lines_raw.split("|") if l.strip()] if content_lines_raw else None
-                    if not lines:
-                        # Use title as the only text if no lines available
-                        lines = [post_title[:30]]
+                    if not lines: lines = [post_title[:30]]
                     local_img = generate_pin(
                         post_title, "", output_file,
                         is_content=True, lines=lines,
-                        tags=tags,
-                        template=pin_template or None,
+                        tags=tags, template=pin_template or None
                     )
-                else:
-                    # Product pin — use image URL
-                    local_img = generate_pin(
-                        post_title, img_url, output_file,
-                        price=price, tags=tags,
-                        template=pin_template or None,
+                elif pin_format == "collage":
+                    same_cat = [p for p in PRODUCTS if p["category"] == category]
+                    if len(same_cat) >= 4:
+                        urls = [get_image_url(p["asin"], p.get("image_id"), category) for p in random.sample(same_cat, 4)]
+                        local_img = generate_collage_pin(urls, f"Ultimate {category.replace('_', ' ').title()} Pack", category, os.path.join("output", output_file))
+                        post_title = f"Ultimate {category.replace('_', ' ').title()} Starter Pack! #aesthetic #starterpack"
+                    else:
+                        pin_format = "static"
+
+                if not is_content and pin_format in ["static", "video"]:
+                    local_img = generate_pinterest_pin(
+                        image_url=img_url,
+                        title=post_title,
+                        category=category,
+                        output_path=os.path.join("output", output_file),
+                        layout_style=chosen_layout
                     )
+
+                # Convert to Video if needed
+                if pin_format == "video" and local_img and os.path.exists(local_img):
+                    video_out = os.path.join("output", video_file)
+                    local_img = generate_video_pin(local_img, video_out, duration_sec=5, fps=30)
             except Exception as e:
                 print(f"  ❌ Image generation failed: {e}")
                 failed_count += 1

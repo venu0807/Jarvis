@@ -629,11 +629,23 @@ from seo_optimizer import get_llm_seo_optimized
 
 def generate_seo_title(name: str, category: str, is_trending: bool = False, price: str = None) -> str:
     """Generate a click-worthy Pinterest SEO title."""
+    import random
+    
+    # High-converting psychological trigger prefixes
+    prefixes = [
+        "[AMAZON MUST-HAVE]",
+        "[VIRAL FIND]",
+        "[AESTHETIC UPGRADE]",
+        "[GAME CHANGER]",
+        "[GENIUS FIND]"
+    ]
+    prefix = random.choice(prefixes)
+    
     llm_title, _ = get_llm_seo_optimized(name, category, price)
     if llm_title:
         if is_trending:
-            return f"🔥 Trending: {llm_title}"
-        return llm_title
+            return f"🔥 Trending: {prefix} {llm_title}"
+        return f"{prefix} {llm_title}"
 
     # Fallback
     cat_map = {
@@ -647,17 +659,24 @@ def generate_seo_title(name: str, category: str, is_trending: bool = False, pric
     suffix = cat_map.get(category, "Amazon Find 🔥")
     cleaned = name.strip()[:60]  # truncate to prevent crazy long titles
     if is_trending:
-        return f"🔥 Trending Now: {cleaned} | {suffix}"
-    return f"{cleaned} | {suffix}"
+        return f"🔥 Trending Now: {prefix} {cleaned} | {suffix}"
+    return f"{prefix} {cleaned} | {suffix}"
 
 
 def generate_seo_description(name: str, category: str, price: str, is_trending: bool = False) -> str:
-    """Generate a keyword-rich Pinterest description for SEO reach."""
+    """Generate a keyword-rich Pinterest description for SEO reach with aggressive CTAs."""
+    # Aggressive Call-To-Action to drive outbound clicks
+    cta_block = "\n\n👇 TAP THE IMAGE OR CLICK THE LINK TO SHOP THIS LOOK! 🛍️✨\n💬 Would you use this? Comment below!"
+    
     _, llm_desc = get_llm_seo_optimized(name, category, price)
     if llm_desc:
         if is_trending:
-            return "[🔥 TRENDING RIGHT NOW] " + llm_desc
-        return llm_desc
+            return "[🔥 TRENDING RIGHT NOW] " + llm_desc + cta_block
+        return llm_desc + cta_block
+
+    # Fallback
+    fallback_desc = f"Obsessed with this {category.replace('_', ' ')} find! Perfect for upgrading your space on a budget."
+    return fallback_desc + cta_block
 
     # Fallback
     base_desc = (

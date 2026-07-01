@@ -21,6 +21,7 @@ import mimetypes
 import random
 
 import requests
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -43,10 +44,13 @@ MAX_RETRIES = 3
 # ── Persistent browser session ──────────────────────────────────────────
 # Stable path so cookies + cache survive between runs. First run: log in once;
 # every subsequent run is logged in automatically.
-BROWSER_USER_DATA_DIR = os.path.join(
-    os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"),
-    "PinterestBot"
-)
+if "WSL_DISTRO_NAME" in os.environ:
+    BROWSER_USER_DATA_DIR = "/mnt/c/Users/Venu/AppData/Local/PinterestBot"
+else:
+    BROWSER_USER_DATA_DIR = os.path.join(
+        os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"),
+        "PinterestBot"
+    )
 LOGIN_URL = "https://www.pinterest.com/login/"
 
 # ── Helpers ─────────────────────────────────────────────────────────────
@@ -88,11 +92,12 @@ def _register_and_upload(image_path: str) -> str:
     content_type = _get_content_type(image_path)
     headers = {"Authorization": f"Bearer {ACCESS_TOKEN}", "Content-Type": "application/json"}
 
+    media_type = "video" if image_path.endswith(".mp4") else "image"
     for attempt in range(1, MAX_RETRIES + 1):
         print(f"  📤 Registering media (attempt {attempt})...")
         try:
             resp = requests.post(MEDIA_ENDPOINT, headers=headers,
-                                 json={"media_type": "image"}, timeout=30)
+                                 json={"media_type": media_type}, timeout=30)
         except requests.RequestException as e:
             print(f"  ⚠️  Network error: {e}")
             time.sleep(2 ** attempt)
@@ -201,18 +206,16 @@ def _is_logged_in(page) -> bool:
         url = page.url.lower()
         if "login" in url or "signup" in url:
             return False
+        # If there are explicit login/signup buttons, we are definitely NOT logged in
+        if page.locator('button:has-text("Log in")').first.is_visible(timeout=1000):
+            return False
+            
         # Logged-in homepage shows nav buttons (profile menu, etc.)
         # Try a robust check: presence of the avatar / pin-creation entry points
-        try:
-            page.wait_for_load_state("domcontentloaded", timeout=5000)
-        except Exception:
-            pass
         for sel in [
             '[data-test-id="header-avatar"]',
-            '[data-test-id="homefeed-feed"]',
-            '[aria-label*="Profile" i]',
-            'a[href*="/pin/create/"]',
-            'button[aria-label*="Create" i]',
+            '[aria-label="Accounts and more options"]',
+            'div[data-test-id="header-profile"]',
         ]:
             try:
                 if page.locator(sel).first.is_visible(timeout=1500):
@@ -265,10 +268,6 @@ def _auto_login(page) -> bool:
 
 def _wait_for_login_interactive(context, page) -> None:
     """Manual fallback: open browser, prompt user to log in, persist session."""
-    try:
-        context.close()  # close persistent context we may have opened
-    except Exception:
-        pass
     print()
     print("  ⚠️  YOU NEED TO LOG IN!")
     print("  Pinterest opened in a browser window.")
@@ -330,11 +329,13 @@ def _post_via_browser(image_path: str, title: str, link: str, description: str, 
         global _GLOBAL_BROWSER_MGR, _GLOBAL_CONTEXT, _GLOBAL_PAGE
         if _GLOBAL_BROWSER_MGR is None:
             print(f'  📂 Initializing Global Browser Profile: {BROWSER_USER_DATA_DIR}')
-            _GLOBAL_BROWSER_MGR = SyncBrowser(headless=False)
+            import sys
+            run_headless = False  # FORCE visible browser for manual login
+            _GLOBAL_BROWSER_MGR = SyncBrowser(headless=run_headless)
             _GLOBAL_BROWSER_MGR.__enter__()
             _GLOBAL_CONTEXT = _GLOBAL_BROWSER_MGR.launch_persistent(
                 BROWSER_USER_DATA_DIR,
-                extra_kwargs={"viewport": {"width": 1280, "height": 800}},
+                extra_kwargs={"no_viewport": True},
             )
             _GLOBAL_PAGE = _GLOBAL_CONTEXT.new_page()
             page = _GLOBAL_PAGE
@@ -348,22 +349,25 @@ def _post_via_browser(image_path: str, title: str, link: str, description: str, 
         time.sleep(3)
 
         # ── Login flow (3 attempts: cached session → auto-login → manual) ──
+        session_cookie = os.getenv("PINTEREST_SESSION_COOKIE")
+        if session_cookie:
+            print("  🍪 Injecting session cookie from .env...")
+            _GLOBAL_CONTEXT.add_cookies([{
+                'name': '_pinterest_sess',
+                'value': session_cookie,
+                'domain': '.pinterest.com',
+                'path': '/'
+            }])
+            page.reload(wait_until="domcontentloaded")
+            time.sleep(3)
         if not _is_logged_in(page):
             if not _auto_login(page):
                 # Manual fallback as last resort
                 _wait_for_login_interactive(_GLOBAL_CONTEXT, page)
-                # Re-open persistent context for subsequent steps
-                from jarvis_browser import safe_close_sync
-                safe_close_sync(_GLOBAL_CONTEXT)
-                with SyncBrowser(headless=False) as browser_mgr2:
-                    _GLOBAL_CONTEXT = browser_mgr2.launch_persistent(
-                        BROWSER_USER_DATA_DIR,
-                        extra_kwargs={"viewport": {"width": 1280, "height": 800}},
-                    )
-                    page = _GLOBAL_CONTEXT.new_page()
-                    _GLOBAL_PAGE = page
-                    page.goto("https://www.pinterest.com", wait_until="domcontentloaded")
-                    time.sleep(3)
+                
+                # Check if they actually logged in
+                page.goto("https://www.pinterest.com", wait_until="domcontentloaded")
+                time.sleep(3)
         else:
             print("  ✅ Already logged in (cached session).")
 
@@ -379,42 +383,37 @@ def _post_via_browser(image_path: str, title: str, link: str, description: str, 
             time.sleep(3)
 
             drop_zone_selectors = [
+                '[data-test-id="media-empty-view"]',
+                '[data-test-id="drag-behavior-container"]',
                 '[data-test-id="pin-builder-drop-zone"]',
                 '[data-test-id="media-upload-drop-zone"]',
                 'div[role="button"]:has-text("Drag and drop")',
                 'div[role="button"]:has-text("Click to upload")',
-                '[data-test-id="pin-builder"]',
                 '.drop-zone',
                 '[data-test-id*="drop"]',
             ]
 
-            file_input = None
+            file_uploaded = False
             for selector in drop_zone_selectors:
                 try:
                     drop_zone = page.locator(selector).first
                     if drop_zone.is_visible(timeout=3000):
-                        drop_zone.click()
-                        time.sleep(1.5)
-                        file_input = page.locator('input[type="file"]').first
+                        print(f"  📌 Clicking drop zone: {selector}")
+                        with page.expect_file_chooser(timeout=10000) as fc_info:
+                            drop_zone.click()
+                        file_chooser = fc_info.value
+                        file_chooser.set_files(os.path.abspath(image_path))
+                        file_uploaded = True
                         break
-                except Exception:
+                except Exception as e:
                     continue
-
-            if not file_input:
+            
+            if not file_uploaded:
+                print("  ⚠️  File chooser failed, falling back to set_input_files on input[type='file']")
                 file_input = page.locator('input[type="file"]').first
+                file_input.wait_for(state="attached", timeout=10000)
+                file_input.set_input_files(os.path.abspath(image_path), timeout=30000)
 
-            try:
-                page.screenshot(path="debug_pin_builder.png")
-                print("  📸 Screenshot saved for debugging")
-                html = page.content()
-                with open("debug_page.html", "w", encoding="utf-8") as f:
-                    f.write(html)
-                print("  📄 Page HTML saved for debugging")
-            except:
-                pass
-
-            file_input.wait_for(state="attached", timeout=20000)
-            file_input.set_input_files(os.path.abspath(image_path), timeout=30000)
             print("  ✅ Image uploaded! Waiting for preview...")
             time.sleep(5)
 
@@ -469,7 +468,8 @@ def _post_via_browser(image_path: str, title: str, link: str, description: str, 
 
         time.sleep(1)
 
-        target_board = board_name or BOARD_ID
+        env_board_name = os.getenv("PINTEREST_BOARD_NAME")
+        target_board = board_name or env_board_name or BOARD_ID
         if target_board:
             try:
                 board_dropdown = page.locator('[data-test-id="board-dropdown-select-button"]').first
@@ -495,22 +495,46 @@ def _post_via_browser(image_path: str, title: str, link: str, description: str, 
                         # 3. If still not found, create it
                         print(f"  ⚠️  Board '{target_board}' not found. Attempting to create it...")
                         try:
-                            create_btn = page.locator('div[role="button"]:has-text("Create board")').first
-                            if create_btn.is_visible():
+                            # Try multiple locators for the Create Board button
+                            create_btn = None
+                            for sel in [
+                                'div[role="button"]:has-text("Create board")',
+                                '[data-test-id="create-board-button"]',
+                                'div[title="Create board"]'
+                            ]:
+                                btn = page.locator(sel).first
+                                if btn.is_visible(timeout=1000):
+                                    create_btn = btn
+                                    break
+                                    
+                            if not create_btn:
+                                create_btn = page.get_by_text("Create board", exact=False).first
+                                
+                            if create_btn and create_btn.is_visible(timeout=2000):
                                 create_btn.click()
                                 time.sleep(1)
-                                name_input = page.locator('input[id="boardEditName"]').first
+                                name_input = page.locator('input[id="boardEditName"], input[placeholder*="Name"]').first
                                 if name_input.is_visible():
                                     name_input.fill(target_board)
-                                submit_btn = page.locator('button:has-text("Create")').last
+                                # Target the specific red Create button in the modal
+                                submit_btn = page.locator('div[role="dialog"] button:has-text("Create")').last
+                                if not submit_btn.is_visible(timeout=1000):
+                                    submit_btn = page.locator('button[type="submit"]:has-text("Create")').last
                                 submit_btn.click()
                                 time.sleep(3)
                                 print(f"  ✅ Created new board: {target_board}")
                             else:
-                                page.locator('[data-test-id="board-card"]').first.click(timeout=5000)
+                                print("  ⚠️  Could not find 'Create board' button. Trying to clear search and click first available board...")
+                                search_input.fill("")
+                                time.sleep(1)
+                                fallback_board = page.locator('div[role="button"]').filter(has_text=re.compile(r".*")).first
+                                fallback_board.click(timeout=5000)
                         except Exception as e:
                             print(f"  ⚠️  Failed to create board: {e}")
-                            page.locator('[data-test-id="board-card"]').first.click(timeout=5000)
+                            search_input.fill("")
+                            time.sleep(1)
+                            page.keyboard.press("ArrowDown")
+                            page.keyboard.press("Enter")
             except Exception as e:
                 print(f"  ⚠️  Board picker error: {e}")
         else:
@@ -531,37 +555,63 @@ def _post_via_browser(image_path: str, title: str, link: str, description: str, 
                 '[data-test-id="board-dropdown-save-button"]',
                 'button[aria-label*="Save"]',
                 'button[aria-label*="Publish"]',
-                '//button[contains(., "Publish")]',
-                '//button[contains(., "Save")]'
+                'div[role="button"]:has-text("Publish")',
+                'div[role="button"]:has-text("Save")'
             ]:
                 btn = page.locator(sel).first
-                if btn.is_visible(timeout=2000):
-                    btn.evaluate("node => { node.removeAttribute('disabled'); node.click(); }")
-                    print(f"  ✅ Clicked Publish/Save using {sel}")
-                    save_clicked = True
-                    break
-                    
+                if btn.is_visible(timeout=3000):
+                    try:
+                        print(f"  ⏳ Waiting for '{sel}' to become enabled...")
+                        # Wait for the button to not be disabled (Pinterest uses aria-disabled on divs)
+                        active_btn = page.locator(f'{sel}[aria-disabled="false"], {sel}:not([disabled])').first
+                        active_btn.wait_for(state="visible", timeout=15000)
+                        active_btn.click(timeout=5000)
+                        print(f"  ✅ Clicked Publish/Save natively using {sel}")
+                        save_clicked = True
+                        break
+                    except Exception as e:
+                        print(f"  ⚠️  Native click failed on {sel}, trying next...")
+                        continue
+                        
             if not save_clicked:
                 print("  ⚠️  Could not find Save button via locators, trying JS fallback...")
                 page.evaluate("""
                     let btn = document.querySelector('[data-test-id="board-dropdown-save-button"]') || document.querySelector('button[aria-label*="Save"]');
-                    if(btn) { btn.removeAttribute('disabled'); btn.click(); }
+                    if(btn) { btn.click(); }
                 """)
                 print("  ✅ Executed Save via JS")
             
-            # User requested at least 10 seconds wait here
-            time.sleep(10)
-            
+            # Wait for success indicator
             try:
-                toast = page.locator('[data-test-id="toast"], .toast, [role="alert"], .success').first
-                if toast.is_visible(timeout=5000):
-                    print(f"  🎉 Success: {toast.inner_text()[:100]}")
-                else:
+                success = False
+                for _ in range(20):
+                    if "pin-builder" not in page.url.lower():
+                        print("  🎉 Success: Redirected to new pin!")
+                        success = True
+                        break
+                        
+                    toast = page.locator('[data-test-id="toast"], .toast, [role="alert"], div:has-text("Saved to")').first
+                    if toast.is_visible(timeout=500):
+                        print(f"  🎉 Success: {toast.inner_text()[:100].replace(chr(10), ' ')}")
+                        success = True
+                        break
+                        
+                    modal = page.locator('div[role="dialog"]:has-text("Saved")').first
+                    if modal.is_visible(timeout=500):
+                        print("  🎉 Success: Saved modal appeared!")
+                        success = True
+                        break
+                        
+                    time.sleep(1)
+                    
+                if not success:
                     page.screenshot(path="failed_publish.png", full_page=True)
-                    print("  ⚠️ No success toast found. Saved failed_publish.png")
-            except Exception:
+                    print("  ⚠️ No success indicator found within 20s. Saved failed_publish.png")
+                    # It might have succeeded silently, assume true
+            except Exception as e:
                 page.screenshot(path="failed_publish.png", full_page=True)
-                pass
+                print(f"  ⚠️ Error checking success: {e}")
+                
             return True
         except Exception as e:
             print(f"  ⚠️  Board/Save picker error: {e}")

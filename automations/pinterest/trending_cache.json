@@ -2,14 +2,6 @@
   "trending": {
     "products": [
       {
-        "asin": "B00E4GACB8",
-        "name": "Trending Product B00E4GACB8",
-        "image_id": "",
-        "price": "",
-        "source": "amazon_bestsellers",
-        "category": "home_decor"
-      },
-      {
         "asin": "B01M16WBW1",
         "name": "Trending Product B01M16WBW1",
         "image_id": "",
@@ -18,16 +10,40 @@
         "category": "home_decor"
       },
       {
-        "asin": "B09541P9WH",
-        "name": "Trending Product B09541P9WH",
+        "asin": "B00Q7OAN50",
+        "name": "Trending Product B00Q7OAN50",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "home_decor"
+      },
+      {
+        "asin": "B00E4GACB8",
+        "name": "Trending Product B00E4GACB8",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "home_decor"
+      },
+      {
+        "asin": "B09V7Z4TJG",
+        "name": "Trending Product B09V7Z4TJG",
         "image_id": "",
         "price": "",
         "source": "amazon_bestsellers",
         "category": "beauty"
       },
       {
-        "asin": "B09V7Z4TJG",
-        "name": "Trending Product B09V7Z4TJG",
+        "asin": "B0B2RM68G2",
+        "name": "Trending Product B0B2RM68G2",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "beauty"
+      },
+      {
+        "asin": "B00U2VQZDS",
+        "name": "Trending Product B00U2VQZDS",
         "image_id": "",
         "price": "",
         "source": "amazon_bestsellers",
@@ -42,6 +58,14 @@
         "category": "tech"
       },
       {
+        "asin": "B0GJTFXNRX",
+        "name": "Trending Product B0GJTFXNRX",
+        "image_id": "",
+        "price": "",
+        "source": "amazon_bestsellers",
+        "category": "tech"
+      },
+      {
         "asin": "B0DCH8VDXF",
         "name": "Trending Product B0DCH8VDXF",
         "image_id": "",
@@ -50,6 +74,6 @@
         "category": "tech"
       }
     ],
-    "timestamp": 1781946430.3797193
+    "timestamp": 1782870015.4081235
   }
 }

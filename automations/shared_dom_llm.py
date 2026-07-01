@@ -95,9 +95,9 @@ async def solve_with_dom_async(page, instruction: str):
     if action == 'click':
         target = action_data['target_text']
         print(f"  -> DOM System clicking: '{target}'")
-        el = await page.get_by_text(target).first
+        el = page.get_by_text(target).first
         if await el.count() == 0:
-             el = await page.get_by_placeholder(target).first
+             el = page.get_by_placeholder(target).first
         await el.evaluate("node => node.click()")
         print("  -> Click complete!")
         
@@ -105,9 +105,9 @@ async def solve_with_dom_async(page, instruction: str):
         target = action_data['target_text']
         val = action_data['value']
         print(f"  -> DOM System typing '{val}' into '{target}'")
-        el = await page.get_by_placeholder(target).first
+        el = page.get_by_placeholder(target).first
         if await el.count() == 0:
-            el = await page.get_by_text(target).first
+            el = page.get_by_text(target).first
         # Use native Playwright fill
         await el.fill(val)
         print("  -> Type complete!")
