@@ -325,12 +325,9 @@ def optimize_csv_column(
     Original Product Name stays intact (used by Amazon link generator).
     """
     import pandas as pd
+    from database import get_products_df, save_products_df
 
-    if not __import__("os").path.exists(csv_path):
-        print(f"  ❌ {csv_path} not found")
-        return
-
-    df = pd.read_csv(csv_path, dtype={"Status": str}).fillna("")
+    df = get_products_df().fillna("")
 
     if backup_existing and target_col not in df.columns:
         df[target_col] = ""
@@ -348,7 +345,7 @@ def optimize_csv_column(
         df.at[i, target_col] = seo_optimize(raw, cat)
         updated += 1
 
-    df.to_csv(csv_path, index=False)
+    save_products_df(df)
     print(f"  ✅ {updated} products optimized")
     print(f"  📄 Column 'SEO Title' added to {csv_path}")
 

@@ -30,6 +30,7 @@ import datetime
 from typing import List, Dict
 
 import pandas as pd
+from database import get_products_df, save_products_df
 
 
 OUT_DIR = "bio"
@@ -45,6 +46,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{title}</title>
 <meta name="description" content="{description}">
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const asin = params.get('asin');
+  if (asin) {{
+    window.location.replace(`https://www.amazon.com/dp/${{asin}}?tag={amazon_tag}`);
+  }}
+</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛍️</text></svg>">
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -283,7 +291,7 @@ def generate_bio_page(
         print(f"  ⚠️  {csv_path} not found — empty page generated")
         products = []
     else:
-        df = pd.read_csv(csv_path, dtype={"Status": str})
+        df = get_products_df()
         df = df.fillna("")
         # Pick products that have not been pinned yet, prefer those with images
         pending = df[
@@ -327,6 +335,7 @@ def generate_bio_page(
 
     os.makedirs(OUT_DIR, exist_ok=True)
 
+    amazon_tag = os.getenv("AMAZON_TAG", "venu080d-21")
     html_content = HTML_TEMPLATE.format(
         title=html.escape(title),
         tagline=html.escape(tagline),
@@ -336,6 +345,7 @@ def generate_bio_page(
         social_cards=_render_social_cards(),
         today_date=datetime.date.today().strftime("%B %d"),
         year=datetime.date.today().year,
+        amazon_tag=amazon_tag,
     )
 
     with open(TEMPLATE_FILE, "w", encoding="utf-8") as f:

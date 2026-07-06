@@ -26,7 +26,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from scraper import scrape_linkedin_posts
+from scraper import scrape_linkedin_posts, scrape_recruiter_profile
 from extractor import extract_contact_info
 from composer import generate_cold_email
 from mailer import send_email
@@ -237,8 +237,11 @@ def main() -> None:
 
             # Fix #10 — small stagger between Ollama call and next scrape
             time.sleep(random.uniform(2, 5))
+            
+            # Scrape the actual recruiter's profile if we have a URL
+            bio_text = scrape_recruiter_profile(post.get("profile_url", ""))
 
-            body = generate_cold_email(post["text"], post["name"])
+            body = generate_cold_email(post["text"], post["name"], bio_text)
             if not body:
                 print(f"  ↪ composer failed for {post['name']} — skip")
                 continue

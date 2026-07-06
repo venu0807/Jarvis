@@ -206,6 +206,10 @@ def _is_logged_in(page) -> bool:
         url = page.url.lower()
         if "login" in url or "signup" in url:
             return False
+            
+        if "business/hub" in url:
+            return True
+            
         # If there are explicit login/signup buttons, we are definitely NOT logged in
         if page.locator('button:has-text("Log in")').first.is_visible(timeout=1000):
             return False
@@ -222,6 +226,12 @@ def _is_logged_in(page) -> bool:
                     return True
             except Exception:
                 continue
+        print(f"  🔍 _is_logged_in failed! Dumping HTML. URL is {url}")
+        try:
+            with open("debug_login.html", "w", encoding="utf-8") as f:
+                f.write(page.content())
+        except Exception:
+            pass
         return False
     except Exception:
         return False
@@ -419,13 +429,13 @@ def _post_via_browser(image_path: str, title: str, link: str, description: str, 
 
         except Exception as e:
             print(f"  ⚠️  Upload error: {e}")
-            page.goto("https://www.pinterest.com/pin-builder/", wait_until="domcontentloaded", timeout=30000)
-            time.sleep(4)
-            file_input = page.locator('input[type="file"]').first
-            file_input.wait_for(state="attached", timeout=20000)
-            file_input.set_input_files(os.path.abspath(image_path), timeout=30000)
-            print("  ✅ Image uploaded on retry! Waiting for preview...")
-            time.sleep(5)
+            try:
+                with open("debug_upload.html", "w", encoding="utf-8") as f:
+                    f.write(page.content())
+                print("  🔍 Dumped upload page HTML to debug_upload.html")
+            except Exception:
+                pass
+            return False
 
         from jarvis_browser import solve_with_dom_sync
 

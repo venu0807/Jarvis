@@ -39,6 +39,49 @@ def _wait_for_checkpoint(page, max_wait_s: int = CHECKPOINT_MAX_WAIT_S) -> bool:
     print("  ⚠ checkpoint wait timed out")
     return False
 
+def scrape_recruiter_profile(profile_url: str) -> str:
+    """Uses Playwright to navigate to a recruiter's profile and extract their About section and recent activity."""
+    if not profile_url or "linkedin.com/in/" not in profile_url:
+        return ""
+        
+    print(f"  🕵️ Scraping recruiter profile: {profile_url}")
+    user_data_dir = os.path.join(os.getcwd(), "playwright_profile")
+    
+    bio_text = ""
+    try:
+        with SyncBrowser(headless=False) as browser_mgr:
+            context = browser_mgr.launch_persistent(user_data_dir)
+            page = context.pages[0] if context.pages else context.new_page()
+            
+            page.goto(profile_url, wait_until="domcontentloaded", timeout=TIMEOUT_MS)
+            page.wait_for_timeout(random.randint(3000, 5000))
+            
+            if any(seg in page.url for seg in ("/checkpoint", "/challenge", "/authwall")):
+                print("  ⚠ Checkpoint hit while scraping profile. Skipping to avoid lock.")
+                return ""
+                
+            # Scroll to load sections
+            page.evaluate("window.scrollBy(0, 800)")
+            page.wait_for_timeout(2000)
+            
+            # Try to grab the "About" section
+            about_section = page.query_selector('div#about ~ div .display-flex')
+            if about_section:
+                bio_text += "ABOUT ME:\n" + about_section.inner_text().strip() + "\n\n"
+                
+            # Try to grab recent activity
+            activity_section = page.query_selector_all('div.feed-shared-update-v2')
+            if activity_section:
+                bio_text += "RECENT POSTS:\n"
+                for act in activity_section[:2]:
+                    bio_text += act.inner_text().strip() + "\n---\n"
+                    
+            print(f"  ✅ Extracted {len(bio_text)} chars of bio/activity.")
+            return bio_text
+    except Exception as e:
+        print(f"  ⚠ Failed to scrape profile: {e}")
+        return ""
+
 
 def scrape_linkedin_posts(job_role):
     """Scrape LinkedIn for recent job posts based on keywords."""
@@ -159,6 +202,11 @@ def scrape_linkedin_posts(job_role):
                     post_content = post_content.replace("Like\nComment\nRepost\nSend", "")
 
                     has_link = "http" in post_content or "www." in post_content
+                    
+                    profile_link = post.query_selector("a.app-aware-link")
+                    profile_url = profile_link.get_attribute("href") if profile_link else ""
+                    if profile_url and "?" in profile_url:
+                        profile_url = profile_url.split("?")[0] # Clean tracking params
 
                     posts_data.append({
                         "text": post_content,
@@ -166,6 +214,7 @@ def scrape_linkedin_posts(job_role):
                         "company": company_or_headline,
                         "has_link": has_link,
                         "link": post_content,
+                        "profile_url": profile_url,
                     })
                 except Exception as e:
                     print(f"Error parsing a post: {e}")

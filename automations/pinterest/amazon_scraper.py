@@ -2,6 +2,7 @@ import os
 import time
 import re
 import pandas as pd
+from database import get_products_df, save_products_df
 from jarvis_browser import SyncBrowser
 from bs4 import BeautifulSoup
 
@@ -17,10 +18,10 @@ def get_dynamic_niches():
     
     # 1. Add core static user niches mapped to specific boards
     core_niches = [
-        {"query": "college dorm essentials", "board": "Student Essentials", "category": "student", "tags": "#collegelife #dormdecor #studentfinds"},
-        {"query": "korean skincare beauty", "board": "Beauty & Vanity", "category": "beauty", "tags": "#koreanskincare #beautyhacks #vanity"},
-        {"query": "aesthetic room decor", "board": "Aesthetic Room Decor", "category": "decor", "tags": "#roomdecor #aesthetic #roominspo"},
-        {"query": "viral kitchen gadgets", "board": "Kitchen Gadgets", "category": "kitchen", "tags": "#kitchengadgets #amazonfinds #cooking"}
+        {"query": "baby nursery must haves", "board": "Baby & Nursery", "category": "baby", "tags": "#nurserydecor #babymusthaves #momlife"},
+        {"query": "home organization storage", "board": "Home Organization", "category": "home", "tags": "#homeorganization #storagehacks #cleantok"},
+        {"query": "travel essentials hacks", "board": "Travel Finds", "category": "travel", "tags": "#travelhacks #travelessentials #vacation"},
+        {"query": "work from home desk setup", "board": "Desk & Tech Setup", "category": "tech", "tags": "#wfhsetup #desksetup #techgadgets"}
     ]
     for niche in core_niches:
         niches.append(niche)
@@ -46,9 +47,9 @@ def scrape_amazon(custom_niches=None):
     active_niches = custom_niches if custom_niches is not None else get_dynamic_niches()
     
     existing_asins = set()
-    if os.path.exists(CSV_FILE):
+    if True:
         try:
-            df_existing = pd.read_csv(CSV_FILE)
+            df_existing = get_products_df()
             if 'Affiliate Link' in df_existing.columns:
                 for link in df_existing['Affiliate Link'].dropna():
                     asin = extract_asin(str(link))
@@ -114,6 +115,20 @@ def scrape_amazon(custom_niches=None):
                 img_url = ""
                 if img_el:
                     img_url = img_el.get("data-old-hires") or img_el.get("src")
+                    
+                # Extract Lifestyle Image (usually 2nd or 3rd image in gallery)
+                lifestyle_url = img_url
+                alt_images = soup.select("#altImages img")
+                if alt_images and len(alt_images) > 1:
+                    # Skip the first one as it's the main white-background image
+                    for alt_img in alt_images[1:]:
+                        src = alt_img.get("src", "")
+                        if src and "._" in src:
+                            # Convert Amazon thumbnail URL to hi-res URL
+                            hi_res = re.sub(r'\._[a-zA-Z0-9_,-]+_\.', '.', src)
+                            if hi_res:
+                                lifestyle_url = hi_res
+                                break
                 
                 # Price
                 price_el = soup.select_one(".a-price .a-offscreen")
@@ -127,11 +142,13 @@ def scrape_amazon(custom_niches=None):
                 
                 print(f"  ✅ Title: {title[:50]}...")
                 print(f"  ✅ Image: {img_url}")
+                print(f"  ✅ Lifestyle Image: {lifestyle_url}")
                 print(f"  ✅ Affiliate Link: {aff_link}")
                 
                 new_products.append({
                     "Product Name": title,
                     "Image URL": img_url,
+                    "Lifestyle Image": lifestyle_url,
                     "Affiliate Link": aff_link,
                     "Status": "",
                     "Category": niche["category"],
@@ -150,16 +167,16 @@ def scrape_amazon(custom_niches=None):
 
     if new_products:
         print(f"\n💾 Saving {len(new_products)} scraped products to {CSV_FILE}...")
-        if not os.path.exists(CSV_FILE):
+        if not True:
             df = pd.DataFrame(new_products)
         else:
-            df = pd.read_csv(CSV_FILE)
+            df = get_products_df()
             if 'Board' not in df.columns:
                 df['Board'] = ''
             new_df = pd.DataFrame(new_products)
             df = pd.concat([df, new_df], ignore_index=True)
             
-        df.to_csv(CSV_FILE, index=False)
+        save_products_df(df)
         print("  ✅ Saved successfully!")
     else:
         print("\n  ⚠️ No products were successfully scraped.")

@@ -289,13 +289,18 @@ class SyncBrowser:
 
     def new_context(self, session_path: Optional[Path] = None):
         """Create a new non-persistent context."""
-        browser = self._playwright.chromium.launch(
-            headless=self._config.headless,
-            args=self._config.launch_args(),
-        )
-        ctx = browser.new_context(
-            **self._config.context_kwargs(session_path)
-        )
+        use_obscura = os.environ.get("USE_OBSCURA") == "1"
+        if use_obscura:
+            browser = self._playwright.chromium.connect_over_cdp("ws://127.0.0.1:9222")
+            ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+        else:
+            browser = self._playwright.chromium.launch(
+                headless=self._config.headless,
+                args=self._config.launch_args(),
+            )
+            ctx = browser.new_context(
+                **self._config.context_kwargs(session_path)
+            )
         # Track both browser and context for cleanup
         self._contexts.append(ctx)
         # We store the browser so we can close it when the context is done
@@ -308,6 +313,15 @@ class SyncBrowser:
         extra_kwargs: Optional[dict] = None,
     ):
         """Launch a persistent context (cookies/cache survive between runs)."""
+        use_obscura = os.environ.get("USE_OBSCURA") == "1"
+        if use_obscura:
+            browser = self._playwright.chromium.connect_over_cdp("ws://127.0.0.1:9222")
+            # Obscura manages its own persistent state when launched with --storage-dir
+            ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+            self._contexts.append(ctx)
+            ctx._jarvis_browser = browser
+            return ctx
+
         kwargs = {
             "headless": self._config.headless,
             **self._config.context_kwargs(),
@@ -315,9 +329,6 @@ class SyncBrowser:
         if extra_kwargs:
             kwargs.update(extra_kwargs)
             
-        import os
-        if os.path.exists('/usr/bin/google-chrome'):
-            kwargs['executable_path'] = '/usr/bin/google-chrome'
             
         if not self._config.headless:
             if 'args' not in kwargs:

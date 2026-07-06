@@ -2,14 +2,6 @@
   "trending": {
     "products": [
       {
-        "asin": "B01M16WBW1",
-        "name": "Trending Product B01M16WBW1",
-        "image_id": "",
-        "price": "",
-        "source": "amazon_bestsellers",
-        "category": "home_decor"
-      },
-      {
         "asin": "B00Q7OAN50",
         "name": "Trending Product B00Q7OAN50",
         "image_id": "",
@@ -18,8 +10,8 @@
         "category": "home_decor"
       },
       {
-        "asin": "B00E4GACB8",
-        "name": "Trending Product B00E4GACB8",
+        "asin": "B01M16WBW1",
+        "name": "Trending Product B01M16WBW1",
         "image_id": "",
         "price": "",
         "source": "amazon_bestsellers",
@@ -34,16 +26,8 @@
         "category": "beauty"
       },
       {
-        "asin": "B0B2RM68G2",
-        "name": "Trending Product B0B2RM68G2",
-        "image_id": "",
-        "price": "",
-        "source": "amazon_bestsellers",
-        "category": "beauty"
-      },
-      {
-        "asin": "B00U2VQZDS",
-        "name": "Trending Product B00U2VQZDS",
+        "asin": "B00ANL8QHA",
+        "name": "Trending Product B00ANL8QHA",
         "image_id": "",
         "price": "",
         "source": "amazon_bestsellers",
@@ -74,6 +58,6 @@
         "category": "tech"
       }
     ],
-    "timestamp": 1782870015.4081235
+    "timestamp": 1783313259.9064095
   }
 }

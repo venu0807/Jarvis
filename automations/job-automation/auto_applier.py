@@ -23,6 +23,13 @@ BASE_DIR = Path(__file__).parent
 sys.path.append(str(BASE_DIR.parent))
 sys.path.append(str(BASE_DIR.parent.parent))
 
+try:
+    from event_bus import get_bus
+    from policy import call_llm
+except ImportError:
+    get_bus = None
+    call_llm = None
+
 from dotenv import load_dotenv
 from jarvis_browser import AsyncBrowser, safe_close_async
 
@@ -40,6 +47,39 @@ from db_logger import save_jobs_to_db
 
 # ── Load .env ─────────────────────────────────────────────────────────────────
 load_dotenv(Path(__file__).parent / ".env")
+
+# ── Constants ─────────────────────────────────────────────────────────────────
+
+def evaluate_job_fit(job: dict) -> bool:
+    """Use OpenClaw/LLM to decide if we should apply to this job."""
+    if not call_llm:
+        return True  # Apply blindly if LLM is unavailable
+        
+    desc = job.get("description", "")
+    if not desc or len(desc) < 50:
+        return True
+        
+    prompt = f"""
+Evaluate this job description for a Full Stack AI Engineer / Python Developer.
+Criteria for REJECTION (Reply NO if any match):
+- Requires strictly 2+ years of professional industry experience (Candidate only has 0-1 years of experience / fresh graduate).
+- Requires C#, Ruby, PHP, or Go as the primary language (Candidate uses Python, Java, React).
+- Is a non-technical role (e.g., Sales, HR, Marketing, Customer Support).
+
+Reply with EXACTLY ONE WORD: "YES" if it's a good fit, or "NO" if it's a bad fit.
+
+Job Description:
+{desc[:2000]}
+"""
+    try:
+        res = call_llm(prompt, mode="run", force="local", pii_acknowledged=True, task_label="job_filter")
+        reply = res.text.strip().upper()
+        if "NO" in reply[:10]:
+            return False
+    except Exception as e:
+        print(f"  ⚠️  LLM filter failed: {e}")
+        
+    return True
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DAILY_LIMIT = int(os.getenv("DAILY_LIMIT", "15"))   # max applies per portal
@@ -179,6 +219,16 @@ async def run_portal(portal_name: str, portal_cls, jobs: list, context) -> list:
                 continue
 
             print(f"\n  → {job['title']} @ {job['company']} ({job['location']})")
+            
+            # AI Commander: Evaluate Job Fit
+            print(f"     🧠 AI Commander analyzing job fit...")
+            if not evaluate_job_fit(job):
+                print(f"     ❌ Skipped: AI Commander rejected (bad fit)")
+                # Mock result for skipped
+                from portals.base import ApplicationResult
+                results.append(ApplicationResult(job=job, status="skipped", reason="AI Commander rejected"))
+                continue
+                
             result = await portal.apply_to_job(page, job)
             results.append(result)
 
@@ -186,6 +236,20 @@ async def run_portal(portal_name: str, portal_cls, jobs: list, context) -> list:
                 applied_count += 1
                 applied_today.add(job["id"])
                 save_applied({job["id"]})
+                
+                # Publish event to the unified Jarvis Event Bus
+                if get_bus:
+                    try:
+                        bus = get_bus()
+                        bus.publish("jobs.*", "jobs.applied", {
+                            "portal": portal.name,
+                            "company": job["company"],
+                            "title": job["title"],
+                            "job_id": job["id"],
+                            "location": job.get("location", "")
+                        })
+                    except Exception as e:
+                        print(f"  ⚠️ Could not publish event: {e}")
             elif result.status == "manual":
                 print(f"     📋 Manual: {result.reason}")
             elif result.status == "skipped":

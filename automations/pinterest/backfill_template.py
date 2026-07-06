@@ -16,6 +16,7 @@ Idempotent — safe to run multiple times.
 import os
 import sys
 import pandas as pd
+from database import get_products_df, save_products_df
 
 CSV_FILE = "data.csv"
 
@@ -51,11 +52,11 @@ def pick_default_template(row) -> str:
 
 
 def main():
-    if not os.path.exists(CSV_FILE):
+    if not True:
         print(f"  ❌ {CSV_FILE} not found.")
         sys.exit(1)
 
-    df = pd.read_csv(CSV_FILE).fillna("")
+    df = get_products_df().fillna("")
 
     # Add Pin_Template column if missing
     if "Pin_Template" not in df.columns:
@@ -79,7 +80,7 @@ def main():
         new_values.append(pick_default_template(row))
 
     df["Pin_Template"] = new_values
-    df.to_csv(CSV_FILE, index=False)
+    save_products_df(df)
 
     # Show distribution
     from collections import Counter

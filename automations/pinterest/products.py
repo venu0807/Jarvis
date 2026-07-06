@@ -23,6 +23,97 @@ CATEGORIES = [
 # ── Verified Products (real ASINs & image URLs) ─────────────────────────
 # Image URL format: https://m.media-amazon.com/images/I/{IMAGE_ID}._AC_SL1500_.jpg
 PRODUCTS = [
+    # ── AFFILIATE STORE PRODUCTS (link to affiliate-store-venu.netlify.app) ──
+    {
+        "name": "Aesthetic Linen Throw Pillow Set",
+        "asin": "B08CFSZLQ4",
+        "image_id": "71rPCCx9NxL",
+        "price": "₹2,899",
+        "category": "cozy_home",
+        "tags": "#homedecor #pillows #aesthetichome #pinteresthome #livingroom",
+        "description": "Transform your living room instantly. These neutral-tone linen pillows are trending on every Pinterest home board.",
+        "store_url": "https://affiliate-store-venu.netlify.app"
+    },
+    {
+        "name": "Minimalist Boho Wall Art Print",
+        "asin": "B07WGVLMQ4",
+        "image_id": "71QK9Y5G5JL",
+        "price": "₹1,659",
+        "category": "cozy_home",
+        "tags": "#wallart #bohodecor #minimalist #homedecor #aestheticroom",
+        "description": "Instantly upgrade any room with this stunning gallery-quality boho print. One of the most pinned home decor items of 2024.",
+        "store_url": "https://affiliate-store-venu.netlify.app"
+    },
+    {
+        "name": "Rattan Wicker Storage Basket Set",
+        "asin": "B09TPPLWSN",
+        "image_id": "71kzR8w4KGL",
+        "price": "₹3,569",
+        "category": "cozy_home",
+        "tags": "#organizer #rattandecor #homedecor #aesthetic #tidyhome",
+        "description": "The secret to a clutter-free Pinterest-worthy home. Hand-woven baskets perfect for blankets, towels, or toys.",
+        "store_url": "https://affiliate-store-venu.netlify.app"
+    },
+    {
+        "name": "Viral Tallow Whipped Face Cream",
+        "asin": "B0C9XQRLWV",
+        "image_id": "71x5q7FbRwL",
+        "price": "₹2,074",
+        "category": "self_care",
+        "tags": "#skincare #tallow #naturalbeauty #glowingskin #beautyroutine",
+        "description": "The Pinterest & TikTok skincare obsession. All-natural, zero chemicals, deeply moisturizing. Glowing skin in 7 days.",
+        "store_url": "https://affiliate-store-venu.netlify.app"
+    },
+    {
+        "name": "Gua Sha Facial Sculpting Tool",
+        "asin": "B07ZQWCLJM",
+        "image_id": "71vNE1TYWSL",
+        "price": "₹1,409",
+        "category": "self_care",
+        "tags": "#guasha #facemassage #skincare #beauty #selfcare",
+        "description": "Reduce puffiness and get a chiseled jawline in minutes. The must-have beauty tool pinned over 2 million times.",
+        "store_url": "https://affiliate-store-venu.netlify.app"
+    },
+    {
+        "name": "Aesthetic Glass Water Bottle",
+        "asin": "B08GKQ9C9Z",
+        "image_id": "71Rwb15VrpL",
+        "price": "₹1,907",
+        "category": "wellness",
+        "tags": "#waterbottle #hydration #wellness #aesthetic #healthylifestyle",
+        "description": "Track your daily hydration in style. This sleek glass bottle with time markers is everywhere on Pinterest wellness boards.",
+        "store_url": "https://affiliate-store-venu.netlify.app"
+    },
+    {
+        "name": "Smart LED Desk Lamp with USB Charging",
+        "asin": "B08DKQ35YW",
+        "image_id": "71y5yFDkmQL",
+        "price": "₹3,319",
+        "category": "tech_gadgets",
+        "tags": "#desklamp #desksetup #studysetup #productive #workfromhome",
+        "description": "Elevate your work from home setup. Eye-care mode, adjustable brightness and a built-in phone charger.",
+        "store_url": "https://affiliate-store-venu.netlify.app"
+    },
+    {
+        "name": "Matcha Bamboo Whisk & Ceremony Set",
+        "asin": "B07RLHX3HC",
+        "image_id": "71J8PF7VPEL",
+        "price": "₹2,406",
+        "category": "kitchen",
+        "tags": "#matcha #matchalatte #morningroutine #aesthetic #greentea",
+        "description": "The morning ritual going viral on Pinterest. Ditch coffee, embrace matcha. Everything you need in one beautiful set.",
+        "store_url": "https://affiliate-store-venu.netlify.app"
+    },
+    {
+        "name": "Portable Bluetooth Mini Projector",
+        "asin": "B07YTYWK98",
+        "image_id": "71wgmaCHJIL",
+        "price": "₹7,469",
+        "category": "tech_gadgets",
+        "tags": "#miniprojector #hometheatre #movienight #gadgets #techgifts",
+        "description": "Turn any wall into a cinema. 1080p, connects to your phone in seconds. The ultimate trending gift on Pinterest.",
+        "store_url": "https://affiliate-store-venu.netlify.app"
+    },
     # ── TECH ──
     {
         "name": "Sony WH-1000XM4 Wireless Noise Canceling Headphones",

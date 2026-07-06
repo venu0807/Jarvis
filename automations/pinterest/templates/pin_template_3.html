@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@300;600&display=swap');
+  
+  body {
+    margin: 0;
+    padding: 0;
+    width: 1000px;
+    height: 1500px;
+    background-color: #EFEBE4;
+    font-family: 'Montserrat', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .polaroid {
+    width: 850px;
+    height: 1300px;
+    background: white;
+    padding: 35px 35px 80px 35px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.08);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  
+  .image-box {
+    width: 100%;
+    flex-grow: 1;
+    background-image: url('{lifestyle_image_url}');
+    background-size: cover;
+    background-position: center;
+    margin-bottom: 40px;
+  }
+
+  .amazon-logo {
+    position: absolute;
+    top: -20px;
+    right: -20px;
+    font-size: 30px;
+    font-weight: 800;
+    color: #fff;
+    background: #111;
+    padding: 15px 25px;
+    border-radius: 50%;
+    transform: rotate(10deg);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+  }
+  
+  .title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 70px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: #222;
+    text-align: center;
+    margin-bottom: 15px;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .subtitle {
+    font-size: 24px;
+    font-weight: 300;
+    color: #888;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+  }
+
+  .price-tag {
+    position: absolute;
+    bottom: 40px;
+    right: 40px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 55px;
+    font-weight: 700;
+    color: #C19A6B;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+  <div class="polaroid">
+    <div class="amazon-logo">a</div>
+    <div class="image-box"></div>
+    <div class="title">{title}</div>
+    <div class="subtitle">Trending on Amazon</div>
+    <div class="price-tag">{price}</div>
+  </div>
+</body>
+</html>

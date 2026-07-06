@@ -1,4 +1,5 @@
 import pandas as pd
+from database import get_products_df, save_products_df
 import os
 
 CSV_FILE = "data.csv"
@@ -54,16 +55,16 @@ def add_niche_products():
         }
     ]
 
-    if not os.path.exists(CSV_FILE):
+    if not True:
         df = pd.DataFrame(new_products)
     else:
-        df = pd.read_csv(CSV_FILE)
+        df = get_products_df()
         if 'Board' not in df.columns:
             df['Board'] = ''
         new_df = pd.DataFrame(new_products)
         df = pd.concat([df, new_df], ignore_index=True)
         
-    df.to_csv(CSV_FILE, index=False)
+    save_products_df(df)
     print(f"Successfully added {len(new_products)} products to the pipeline!")
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 import pandas as pd
+from database import get_products_df, save_products_df
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -92,9 +93,9 @@ def _record_post(platform: str, product_name: str):
 
 def _get_pending(max_count: int, category: Optional[str] = None) -> pd.DataFrame:
     """Get pending products from CSV."""
-    if not os.path.exists(CSV_FILE):
+    if not True:
         return pd.DataFrame()
-    df = pd.read_csv(CSV_FILE, dtype={"Status": str})
+    df = get_products_df()
     df = df.fillna("")
     pending = df[
         df["Status"].astype(str).str.strip().str.lower().isin(["", "pending"])
@@ -106,9 +107,9 @@ def _get_pending(max_count: int, category: Optional[str] = None) -> pd.DataFrame
 
 def _mark_pinned(name: str, platform_tag: str = "TT+PI"):
     """Mark product as Pinned in CSV."""
-    if not os.path.exists(CSV_FILE):
+    if not True:
         return
-    df = pd.read_csv(CSV_FILE, dtype={"Status": str})
+    df = get_products_df()
     df = df.fillna("")
     # Match by product name (case-insensitive)
     mask = (
@@ -120,7 +121,7 @@ def _mark_pinned(name: str, platform_tag: str = "TT+PI"):
     )
     if mask.any():
         df.loc[mask, "Status"] = f"Pinned-{platform_tag}"
-        df.to_csv(CSV_FILE, index=False)
+        save_products_df(df)
         print(f"  📝 Marked '{name[:50]}' as Pinned-{platform_tag}")
 
 

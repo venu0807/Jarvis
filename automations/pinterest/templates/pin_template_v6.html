@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body {
+    margin: 0; padding: 0; width: 1000px; height: 1500px;
+    background-image: url('{lifestyle_image_url}');
+    background-size: cover; background-position: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  
+  .overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.3); z-index: 1;
+  }
+  
+  .imessage {
+    z-index: 2; width: 600px; display: flex; flex-direction: column; gap: 20px;
+    background: rgba(255,255,255,0.85); backdrop-filter: blur(20px);
+    border-radius: 40px; padding: 40px; box-shadow: 0 30px 60px rgba(0,0,0,0.2);
+  }
+  
+  .bubble {
+    max-width: 80%; padding: 20px 30px; border-radius: 30px; font-size: 32px; line-height: 1.4; position: relative;
+  }
+  
+  .gray {
+    background: #E9E9EB; color: black; align-self: flex-start;
+    border-bottom-left-radius: 5px;
+  }
+  
+  .blue {
+    background: #007AFF; color: white; align-self: flex-end;
+    border-bottom-right-radius: 5px;
+  }
+
+  .product-preview {
+    width: 250px; height: 250px; background: white; border-radius: 20px;
+    margin-top: 15px; padding: 10px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  }
+  .product-preview img {
+    max-width: 100%; max-height: 100%; object-fit: contain;
+  }
+</style>
+</head>
+<body>
+  <div class="overlay"></div>
+  <div class="imessage">
+    <div style="text-align: center; color: #888; font-size: 24px; font-weight: 600; margin-bottom: 20px;">iMessage<br>Today 10:41 AM</div>
+    <div class="bubble gray">Omg wait... where did you get that?! It's gorgeous 😍</div>
+    <div class="bubble blue">
+      Right?! Found it on Amazon! It was literally {price}.
+      <div class="product-preview"><img src="{product_image_url}"></div>
+    </div>
+    <div class="bubble gray">No way! Send me the link!!</div>
+    <div class="bubble blue">Link is saved in my bio! ✨</div>
+  </div>
+</body>
+</html>

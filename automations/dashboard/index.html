@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis Automation Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-elements">
+        <div class="orb orb-red"></div>
+        <div class="orb orb-blue"></div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>Jarvis Automations</h1>
+            <p>Control Center</p>
+        </header>
+
+        <main class="grid">
+            <!-- Pinterest Bot Card -->
+            <div class="card pinterest-card">
+                <div class="card-header">
+                    <div class="icon-wrapper">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22c1.5-5.5 1-7.5 1.5-10.5"/><path d="M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10z"/><path d="M12 6c-3.3 0-6 2.7-6 6a6 6 0 0 0 11.2 3.1c1.3-2.3.8-6.1-1.2-8a5.9 5.9 0 0 0-4-1.1z"/></svg>
+                    </div>
+                    <h2>Pinterest Bot</h2>
+                </div>
+                <div class="card-body">
+                    <div class="status">
+                        <span class="status-dot idle" id="pin-status-dot"></span>
+                        <span id="pin-status-text">Status: Idle</span>
+                    </div>
+                    <p class="description">Scrapes products and automatically pins them to target boards.</p>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-pinterest" id="btn-pinterest">
+                        <span>Run Now</span>
+                        <div class="loader"></div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- LinkedIn Bot Card -->
+            <div class="card linkedin-card">
+                <div class="card-header">
+                    <div class="icon-wrapper">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                    </div>
+                    <h2>LinkedIn Bot</h2>
+                </div>
+                <div class="card-body">
+                    <div class="status">
+                        <span class="status-dot idle" id="in-status-dot"></span>
+                        <span id="in-status-text">Status: Idle</span>
+                    </div>
+                    <p class="description">Automates connection requests and engages with targeted feeds.</p>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-linkedin" id="btn-linkedin">
+                        <span>Run Now</span>
+                        <div class="loader"></div>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

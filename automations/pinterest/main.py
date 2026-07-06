@@ -23,17 +23,20 @@ import os
 import time
 import random
 import argparse
+import requests
 
 import pandas as pd
+from database import get_products_df, save_products_df
 from dotenv import load_dotenv
 
 load_dotenv()
-os.environ["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"] = "/usr/bin/google-chrome"
 
-from generator import generate_seo_title, generate_seo_description, generate_pin
-from image_builder import generate_pinterest_pin
+from seo_gemini import generate_seo_title, generate_seo_description
+from generator import generate_pin
+from aesthetic_blender import generate_aesthetic_pin
 from collage_builder import generate_collage_pin
 from video_builder import generate_video_pin
+from video_collage import generate_flash_collage
 from poster import post_pin
 from datetime import datetime
 from products import (
@@ -67,12 +70,12 @@ def show_stats():
     print(f"     💡 Total pin ideas:       {counts['total'] + counts['content_pins']}")
 
     # CSV stats
-    if os.path.exists(CSV_FILE):
-        df = pd.read_csv(CSV_FILE, dtype={"Status": str})
+    if True:
+        df = get_products_df()
         total = len(df)
         pinned = len(df[df.get("Status", "").astype(str).str.strip().str.lower() == "pinned"])
         pending = total - pinned
-        print(f"\n  📋 Data.csv Status:")
+        print(f"\n  📋 Database Status:")
         print(f"     ✅ Pinned:  {pinned}")
         print(f"     ⏳ Pending: {pending}")
         print(f"     📊 Total:   {total}")
@@ -121,8 +124,8 @@ def refill_csv():
 
     # Load existing CSV
     existing_names = set()
-    if os.path.exists(CSV_FILE):
-        df_existing = pd.read_csv(CSV_FILE)
+    if True:
+        df_existing = get_products_df()
         existing_names = set(df_existing["Product Name"].str.strip().str.lower())
         print(f"  📋 Found {len(df_existing)} existing products in CSV")
 
@@ -133,7 +136,8 @@ def refill_csv():
     for p in PRODUCTS:
         name = p["name"].strip().lower()
         if name not in existing_names:
-            link = get_affiliate_link(p["asin"], AMAZON_TAG)
+            # Use store_url if available (affiliate store products), else use Amazon direct link
+            link = p.get("store_url") or get_affiliate_link(p["asin"], AMAZON_TAG)
             img_url = get_image_url(p["asin"], p.get("image_id"), p.get("category", "tech"))
             new_rows.append({
                 "Product Name": p["name"],
@@ -178,14 +182,14 @@ def refill_csv():
 
     # Append to CSV
     new_df = pd.DataFrame(new_rows)
-    if os.path.exists(CSV_FILE):
+    if True:
         combined = pd.concat([df_existing, new_df], ignore_index=True)
-        combined.to_csv(CSV_FILE, index=False)
+        save_products_df(combined)
     else:
-        new_df.to_csv(CSV_FILE, index=False)
+        save_products_df(new_df)
 
     print(f"  ✅ Added {added} new entries to {CSV_FILE}!")
-    print(f"  📊 Total products now: {len(pd.read_csv(CSV_FILE))}")
+    print(f"  📊 Total products now: {len(get_products_df())}")
 
     # Show categories added
     categories = set(r["Category"] for r in new_rows)
@@ -202,8 +206,8 @@ def refill_csv_trending():
 
     # Load existing CSV
     existing_names = set()
-    if os.path.exists(CSV_FILE):
-        df_existing = pd.read_csv(CSV_FILE)
+    if True:
+        df_existing = get_products_df()
         existing_names = set(df_existing["Product Name"].str.strip().str.lower())
         print(f"  📋 Found {len(df_existing)} existing products in CSV")
 
@@ -262,14 +266,14 @@ def refill_csv_trending():
 
     # Append to CSV (trending products first)
     new_df = pd.DataFrame(new_rows)
-    if os.path.exists(CSV_FILE):
+    if True:
         combined = pd.concat([df_existing, new_df], ignore_index=True)
-        combined.to_csv(CSV_FILE, index=False)
+        save_products_df(combined)
     else:
-        new_df.to_csv(CSV_FILE, index=False)
+        save_products_df(new_df)
 
     print(f"  ✅ Added {added} new entries to {CSV_FILE}!")
-    print(f"  📊 Total products now: {len(pd.read_csv(CSV_FILE))}")
+    print(f"  📊 Total products now: {len(get_products_df())}")
 
     # Show categories added
     categories = set(r["Category"] for r in new_rows)
@@ -305,6 +309,37 @@ def refill_trending():
 
 # ── Run Automation ──────────────────────────────────────────────────────
 
+def send_to_n8n(image_path: str, title: str, description: str, link: str):
+    """Fires a webhook to n8n containing the generated video and SEO metadata."""
+    webhook_url = os.getenv("N8N_WEBHOOK_URL")
+    if not webhook_url:
+        return
+    
+    try:
+        print(f"  🌐 Firing webhook to n8n...")
+        
+        # We send the text data as form data
+        data = {
+            "title": title,
+            "description": description,
+            "link": link
+        }
+        
+        # We upload the raw .mp4 or .png file directly to n8n
+        if image_path and os.path.exists(image_path):
+            with open(image_path, 'rb') as f:
+                files = {'file': (os.path.basename(image_path), f)}
+                response = requests.post(webhook_url, data=data, files=files, timeout=15)
+        else:
+            response = requests.post(webhook_url, data=data, timeout=15)
+            
+        if response.status_code in [200, 201]:
+            print(f"  ✅ Successfully sent to n8n!")
+        else:
+            print(f"  ⚠️  n8n Webhook returned status code: {response.status_code}")
+    except Exception as e:
+        print(f"  ❌ Failed to send webhook to n8n: {e}")
+
 
 def run_automation(max_pins: int = None, category: str = None):
     """Main automation loop — post pending pins from CSV."""
@@ -318,25 +353,25 @@ def run_automation(max_pins: int = None, category: str = None):
     print("   Using API v5 → Browser fallback")
     print("=" * 55)
 
-    print("\n  🔄 Auto-refilling database before posting...")
+    print("\n  🔄 Refilling from live trends...")
     try:
         refill_trending()
     except Exception as e:
         print(f"  ⚠️ Auto-refill failed: {e}")
 
     # Check CSV exists
-    if not os.path.exists(CSV_FILE):
+    if not True:
         print(f"\n  ❌ {CSV_FILE} not found!")
         print("  💡 Run 'python main.py refill' to populate it first!")
         return
 
-    df = pd.read_csv(CSV_FILE, dtype=str).fillna("")
+    df = get_products_df().fillna("")
     total = len(df)
 
     # Find pending pins
-    pending_mask = df.get("Status", "").astype(str).str.strip().str.lower() != "pinned"
+    pending_mask = df["Status"].astype(str).str.strip().str.lower() != "pinned" if "Status" in df.columns else pd.Series([True] * len(df))
     if category:
-        pending_mask = pending_mask & (df.get("Category", "").astype(str).str.strip().str.lower() == category.lower())
+        pending_mask = pending_mask & (df["Category"].astype(str).str.strip().str.lower() == category.lower() if "Category" in df.columns else pd.Series([True] * len(df)))
     pending_indices = df[pending_mask].index.tolist()
 
     if not pending_indices:
@@ -398,14 +433,38 @@ def run_automation(max_pins: int = None, category: str = None):
                 board_name = category_board_map.get(category.lower(), "Trending Amazon Finds")
 
 
-            # --- Seasonal Trend Surfing ---
+            # --- Seasonal Trend Surfing (Holiday Spike Engine) ---
             month = datetime.now().month
-            if month in [8, 9] and category in ["dorm_decor", "study_supplies"]:
-                post_title = f"Back to School: {post_title}"
-            elif month in [11, 12] and category in ["tech_gadgets", "mens_fashion", "womens_fashion", "tech"]:
-                post_title = f"Holiday Gift Guide: {post_title}"
-            elif month == 2 and category in ["womens_fashion", "self_care", "wellness"]:
-                post_title = f"Valentine's Day Gift: {post_title}"
+            seasonal_prefix = ""
+            seasonal_tags = ""
+            
+            if month in [1, 2]:
+                seasonal_prefix = "Valentine's Gift: "
+                seasonal_tags = " #valentinesgift #giftideas #selflove"
+            elif month == 5:
+                seasonal_prefix = "Mother's Day Find: "
+                seasonal_tags = " #mothersdaygift #giftformom"
+            elif month == 7:
+                seasonal_prefix = "Prime Day Deal: "
+                seasonal_tags = " #primedaydeals #amazonmusthaves"
+            elif month in [8, 9]:
+                seasonal_prefix = "Back to School: "
+                seasonal_tags = " #backtoschool #dormessentials #collegelife"
+            elif month == 10:
+                seasonal_prefix = "Fall Aesthetic: "
+                seasonal_tags = " #fallaesthetic #halloweenfinds #cozyseason"
+            elif month in [11, 12]:
+                seasonal_prefix = "Holiday Gift Guide: "
+                seasonal_tags = " #blackfridaydeals #christmasgifts #giftguide"
+
+            # Inject SEO prefix if title isn't already too long
+            if seasonal_prefix and len(post_title) < 65:
+                post_title = f"{seasonal_prefix}{post_title}"
+                
+            # Inject high-conversion seasonal tags
+            if seasonal_tags:
+                tags = f"{tags}{seasonal_tags}"
+                description = f"{description}{seasonal_tags}"
 
             # --- Layout --- 
             chosen_layout = "seo_full_bleed"
@@ -444,18 +503,45 @@ def run_automation(max_pins: int = None, category: str = None):
                         pin_format = "static"
 
                 if not is_content and pin_format in ["static", "video"]:
-                    local_img = generate_pinterest_pin(
-                        image_url=img_url,
-                        title=post_title,
-                        category=category,
-                        output_path=os.path.join("output", output_file),
-                        layout_style=chosen_layout
-                    )
+                    lifestyle_img = str(row.get("Lifestyle Image", ""))
+                    if not lifestyle_img:
+                        lifestyle_img = img_url
+                        
+                    import random
+                    post_as_video = random.choice([True, False])
+                    
+                    # Generate aesthetic template variations (3 for video, 1 for static)
+                    temp_imgs = []
+                    num_templates = 3 if post_as_video else 1
+                    for t_idx in range(num_templates):
+                        t_out = os.path.join("output", f"temp_{t_idx}_{output_file}")
+                        t_success = generate_aesthetic_pin(
+                            image_url=lifestyle_img,
+                            category=category,
+                            output_path=t_out,
+                            title=post_title,
+                            subtitle=description[:60] + "..." if len(description) > 60 else description,
+                            price=row.get("Price", ""),
+                            product_image_url=row.get("Image URL", "")
+                        )
+                        if t_success:
+                            temp_imgs.append(t_out)
 
-                # Convert to Video if needed
-                if pin_format == "video" and local_img and os.path.exists(local_img):
-                    video_out = os.path.join("output", video_file)
-                    local_img = generate_video_pin(local_img, video_out, duration_sec=5, fps=30)
+                    # Convert to Fast Collage Video OR keep as single static image
+                    if temp_imgs:
+                        if post_as_video and len(temp_imgs) > 1:
+                            video_out = os.path.join("output", video_file)
+                            print(f"  🎬 Generating Flash Collage Video: {video_out}")
+                            generated_video = generate_flash_collage(temp_imgs, video_out, fps=30, duration_per_image=1.5)
+                            if generated_video and os.path.exists(generated_video):
+                                local_img = generated_video # Override static image path with video path
+                            else:
+                                local_img = temp_imgs[0] # Fallback
+                        else:
+                            print(f"  🖼️ Using single Aesthetic Static Image instead of video")
+                            local_img = temp_imgs[0]
+                    else:
+                        local_img = None
             except Exception as e:
                 print(f"  ❌ Image generation failed: {e}")
                 failed_count += 1
@@ -466,19 +552,43 @@ def run_automation(max_pins: int = None, category: str = None):
                 failed_count += 1
                 continue
 
+            bio_link = os.getenv("BIO_LINK")
+            if bio_link:
+                utm = "utm_source=Pinterest&utm_medium=organic"
+                final_link = f"{bio_link}?{utm}&asin={row.get('ASIN', '')}" if row.get('ASIN') else f"{bio_link}?{utm}"
+            else:
+                final_link = aff_link
+
             success = post_pin(
                 image_path=local_img, 
                 title=post_title, 
-                link=aff_link,
+                link=final_link,
                 description=description,
                 board_name=board_name if board_name else None
             )
 
             if success:
                 df.at[csv_idx, "Status"] = "Pinned"
-                df.to_csv(CSV_FILE, index=False)
+                save_products_df(df)
                 print(f"  ✅ CSV updated")
                 pinned_count += 1
+                
+                # Instantly ping the n8n Webhook with the video and data
+                send_to_n8n(image_path=local_img, title=post_title, description=description, link=final_link)
+                
+                # Publish event to the unified Jarvis Event Bus
+                try:
+                    import sys
+                    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+                    from event_bus import get_bus
+                    bus = get_bus()
+                    bus.publish("pinterest.*", "pinterest.pin_posted", {
+                        "product": post_title,
+                        "board": board_name if board_name else "",
+                        "link": final_link
+                    })
+                except Exception as e:
+                    print(f"  ⚠️ Could not publish event: {e}")
             else:
                 print(f"  ❌ Failed to post '{title}'")
                 failed_count += 1
@@ -505,7 +615,7 @@ def run_automation(max_pins: int = None, category: str = None):
     print(f"   ⚡ Rate:      {pinned_count / max(elapsed, 1) * 60:.1f} pins/hr")
 
     # Remaining estimate
-    df = pd.read_csv(CSV_FILE, dtype={"Status": str})
+    df = get_products_df()
     remaining = len(df[df.get("Status", "").astype(str).str.strip().str.lower() != "pinned"])
     if remaining > 0:
         eta = remaining * SLEEP_BETWEEN_PINS / 60
@@ -606,7 +716,8 @@ def main():
     elif args.command == "video":
         from cross_post import _build_video_for_row
         import pandas as pd
-        df = pd.read_csv(CSV_FILE, dtype={"Status": str}).fillna("")
+        from database import get_products_df, save_products_df
+        df = get_products_df().fillna("")
         pending = df[
             df["Status"].astype(str).str.strip().str.lower().isin(["", "pending"])
         ]
@@ -620,16 +731,17 @@ def main():
                 print(f"  ✅ Video saved: {vid}")
     elif args.command == "bio":
         from bio_page import generate_bio_page
-        out = generate_bio_page(csv_path=CSV_FILE, max_products=8)
+        out = generate_bio_page(max_products=8)
         print(f"\n  📄 Preview: file://{os.path.abspath(out)}")
         print(f"  🚀 Deploy free: github.io, netlify.com, or surge.sh")
     elif args.command == "seo":
         from seo_optimizer import optimize_csv_column, seo_variants
-        print("  🔧 SEO-optimizing all products in data.csv...")
+        print("  🔧 SEO-optimizing all products in database...")
         optimize_csv_column()
         # Show 3 sample variants
         import pandas as pd
-        df = pd.read_csv(CSV_FILE).fillna("")
+        from database import get_products_df, save_products_df
+        df = get_products_df().fillna("")
         print("\n  📝 Sample SEO variants:")
         for i, row in df.head(3).iterrows():
             raw = str(row.get("Product Name", ""))

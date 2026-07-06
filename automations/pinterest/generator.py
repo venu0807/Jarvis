@@ -684,8 +684,8 @@ def generate_seo_description(name: str, category: str, price: str, is_trending: 
         f"⭐ Real reviews • 🚚 Prime shipping • 💯 Worth every penny.\n\n"
         f"Packed with the features students actually need. Perfect for dorm life, study sessions, "
         f"or daily use. Thousands of 5-star reviews.\n\n"
-        f"👉 Click the link to shop on Amazon (affordable + fast Prime delivery).\n\n"
-        f"#amazonfinds #collegeessentials #studentfavorites #{category.replace('_', '')} #musthaves"
+        f"👉 Click the link in my bio to shop! 🛍️✨\n\n"
+        f"#finds #collegeessentials #studentfavorites #{category.replace('_', '')} #musthaves"
     )
     if is_trending:
         base_desc = "[🔥 TRENDING RIGHT NOW] " + base_desc
@@ -837,7 +837,7 @@ def generate_big_number_pin(product_name: str, image_url: str,
 
     # Subtitle
     sub_font = _get_font(36)
-    sub_text = "Tap to shop on Amazon"
+    sub_text = "Link in bio to shop"
     bb = draw.textbbox((0, 0), sub_text, font=sub_font)
     tw = bb[2] - bb[0]
     sub_x = (bg_w - tw) // 2
