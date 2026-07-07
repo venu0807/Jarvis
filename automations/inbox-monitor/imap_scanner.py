@@ -39,6 +39,18 @@ KEYWORDS = ["interview", "application", "resume", "offer", "recruiter", "shortli
 def clean_text(text):
     return text.replace("\r", "").replace("\n", " ").strip()
 
+PROCESSED_EMAILS_FILE = BASE_DIR / "processed_emails.json"
+
+def load_processed_emails():
+    if PROCESSED_EMAILS_FILE.exists():
+        with open(PROCESSED_EMAILS_FILE, "r") as f:
+            return set(json.load(f))
+    return set()
+
+def save_processed_emails(processed_set):
+    with open(PROCESSED_EMAILS_FILE, "w") as f:
+        json.dump(list(processed_set), f)
+
 def decode_mime_words(s):
     if not s:
         return ""
@@ -127,13 +139,14 @@ def check_inbox():
         return
 
     print("📧 Connecting to Gmail securely...")
+    processed_emails = load_processed_emails()
     try:
         mail = imaplib.IMAP4_SSL("imap.gmail.com")
         mail.login(GMAIL_ADDRESS, GMAIL_APP_PASS)
         mail.select("inbox")
 
-        # Search for UNREAD emails
-        status, messages = mail.search(None, "UNREAD")
+        # Search for UNSEEN emails
+        status, messages = mail.search(None, "UNSEEN")
         
         if status != "OK":
             print("No new messages found.")
@@ -147,6 +160,11 @@ def check_inbox():
             for response_part in msg_data:
                 if isinstance(response_part, tuple):
                     msg = email.message_from_bytes(response_part[1])
+                    msg_id = msg.get("Message-ID", "").strip()
+                    
+                    if msg_id and msg_id in processed_emails:
+                        continue
+                        
                     subject = decode_mime_words(msg.get("Subject"))
                     sender = decode_mime_words(msg.get("From"))
                     
@@ -154,6 +172,8 @@ def check_inbox():
                     is_relevant = any(k in subject.lower() for k in KEYWORDS)
                     
                     if not is_relevant:
+                        if msg_id:
+                            processed_emails.add(msg_id)
                         continue
                         
                     print(f"\n🔍 Relevant Email Detected: {subject} from {sender}")
@@ -192,10 +212,11 @@ def check_inbox():
                         link="https://mail.google.com/"
                     )
                     
-                    # Optionally mark as read? For safety we leave it unread so the user sees it, 
-                    # but if we run every 4 hours we might alert repeatedly.
-                    # We will mark it as read for now to prevent duplicate alerts.
-                    mail.store(e_id, '+FLAGS', '\\Seen')
+                    # We leave it unread so the user sees it in their inbox!
+                    # Mark it as processed in our local database so we don't alert again.
+                    if msg_id:
+                        processed_emails.add(msg_id)
+                        save_processed_emails(processed_emails)
 
         mail.close()
         mail.logout()
