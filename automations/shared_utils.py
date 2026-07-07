@@ -26,6 +26,7 @@ from __future__ import annotations
 import functools
 import json
 import logging
+import sqlite3
 import os
 import random
 import sys
@@ -327,3 +328,42 @@ def ist_now() -> str:
 def today_ist() -> str:
     """Return today's date in YYYY-MM-DD format (IST)."""
     return _ist_now_dt().strftime("%Y-%m-%d")
+
+
+# ---------------------------------------------------------------------------
+# Metrics Logging
+# ---------------------------------------------------------------------------
+
+def log_metric(category: str, subcategory: str, count: int = 1) -> None:
+    """Logs an operational metric to the central SQLite metrics database.
+    
+    Args:
+        category: High-level metric category (e.g., 'emails_sent', 'skills_learned').
+        subcategory: Granular detail (e.g., 'Django Developer', 'Docker').
+        count: The value to increment.
+    """
+    db_path = Path(__file__).parent / "metrics.db"
+    
+    try:
+        conn = sqlite3.connect(db_path, timeout=5.0)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                category TEXT,
+                subcategory TEXT,
+                count INTEGER
+            )
+        ''')
+        cursor.execute('''
+            INSERT INTO metrics (timestamp, category, subcategory, count) 
+            VALUES (?, ?, ?, ?)
+        ''', (ist_now(), category, subcategory, count))
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        log = setup_logging("shared_utils")
+        log.error(f"Failed to log metric: {e}")
+

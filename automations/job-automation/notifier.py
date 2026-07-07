@@ -12,6 +12,7 @@ import datetime
 import smtplib
 import os
 import sys
+import requests
 
 # Configure UTF-8 encoding for standard output and error to avoid UnicodeEncodeError on Windows
 if sys.stdout.encoding != 'utf-8':
@@ -28,6 +29,7 @@ load_dotenv(Path(__file__).parent / ".env")
 GMAIL_ADDRESS  = os.getenv("GMAIL_ADDRESS",  "")
 GMAIL_APP_PASS = os.getenv("GMAIL_APP_PASS", "")
 NOTIFY_EMAIL   = os.getenv("NOTIFY_EMAIL", GMAIL_ADDRESS)  # recipient; defaults to sender (self-mail)
+N8N_WEBHOOK_URL = os.getenv("N8N_JOB_WEBHOOK_URL", "")
 
 
 # ── Email builder ─────────────────────────────────────────────────────────────
@@ -209,14 +211,32 @@ def send_email(summary: dict):
         print(f"  📧 Email sent to {NOTIFY_EMAIL or GMAIL_ADDRESS}")
     except Exception as e:
         print(f"  ❌ Email error: {e}")
+def send_n8n_webhook(summary: dict):
+    if not N8N_WEBHOOK_URL:
+        return
+    try:
+        payload = {
+            "date": summary["date"],
+            "totals": summary["totals"],
+            "portal_counts": summary.get("portal_counts", {}),
+            "text_report": build_plain(summary)
+        }
+        res = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=5)
+        if res.status_code in (200, 201):
+            print(f"  🚀 N8N Webhook sent to {N8N_WEBHOOK_URL}")
+        else:
+            print(f"  ❌ N8N Webhook failed with status {res.status_code}: {res.text}")
+    except Exception as e:
+        print(f"  ❌ N8N Webhook error: {e}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def notify(summary: dict):
-    """Send all notifications. Email-only — Telegram removed 2026-06-16."""
-    print("\n📬 Sending notifications (email-only)...")
+    """Send all notifications (Email & N8N Webhooks)."""
+    print("\n📬 Sending notifications...")
     send_email(summary)
+    send_n8n_webhook(summary)
     print("✅ Notifications sent!")
 
 

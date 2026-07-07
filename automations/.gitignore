@@ -1,0 +1,29 @@
+# Secrets and Environments
+.env
+.env.*
+*.env
+
+# SQLite Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Python Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Node
+node_modules/
+package-lock.json
+
+# IDEs and OS Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+nohup.out

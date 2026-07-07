@@ -24,8 +24,6 @@ import random
 import time
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 from scraper import scrape_linkedin_posts, scrape_recruiter_profile
 from extractor import extract_contact_info
 from composer import generate_cold_email
@@ -33,16 +31,13 @@ from mailer import send_email
 
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from shared_utils import setup_logging
+from shared_utils import setup_logging, log_metric
 
 # ── Paths & config ─────────────────────────────────────────────────────────────
 
 BASE_DIR = Path(__file__).resolve().parent
 
 log = setup_logging("linkedin_outreach", log_dir=BASE_DIR / "logs")
-
-# Fix #9: load .env from main.py's directory regardless of cwd
-load_dotenv(BASE_DIR / ".env")
 
 DEFAULT_ROLES = [
     "Python Developer",
@@ -262,6 +257,7 @@ def main() -> None:
                 per_role_sent += 1
                 _record_sent(email, role, post.get("company", ""),
                              "Interest in Python/Django/AI Developer Role")
+                log_metric("emails_sent", "Cold Outreach", 1)
 
                 # Fix #10 — radar-aware pacing: longer pause every few sends
                 if emails_sent_today % 5 == 0:

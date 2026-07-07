@@ -14,6 +14,14 @@ except Exception as e:
 DB_PATH = Path(__file__).parent.parent / "job-automation" / "output" / "jobs.db"
 OUTPUT_FILE = Path(__file__).parent / "daily_lesson.md"
 
+try:
+    from shared_utils import log_metric
+except ImportError:
+    # Handle if run directly and shared_utils isn't in path
+    sys.path.append(str(Path(__file__).parent.parent))
+    from shared_utils import log_metric
+
+
 def fetch_skipped_jobs():
     """Fetch 3 recent jobs from the database to analyze."""
     try:
@@ -79,6 +87,9 @@ Format perfectly in Markdown. Start directly with the title of the skill (e.g. "
             with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
                 f.write(md_content)
             print(f"✅ Daily lesson saved to {OUTPUT_FILE}")
+            
+            # Log the metric!
+            log_metric("skills_learned", "Micro-Learning Lesson", 1)
         else:
             print("⚠️ Generation returned empty content.")
     except Exception as e:

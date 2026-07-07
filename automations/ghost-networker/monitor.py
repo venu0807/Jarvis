@@ -20,6 +20,12 @@ except Exception as e:
 
 TARGETS_FILE = Path(__file__).parent / "targets.json"
 
+try:
+    from shared_utils import log_metric
+except ImportError:
+    sys.path.append(str(Path(__file__).parent.parent))
+    from shared_utils import log_metric
+
 def fetch_github_activity(username: str):
     print(f"📡 Fetching GitHub activity for {username}...")
     url = f"https://github.com/{username}.atom"
@@ -94,6 +100,10 @@ Respond with ONLY "YES" or "NO", followed by a one-sentence reason why.
             print(f"  Event: {event['title']}")
             print(f"  Link: {event['link']}")
             print(f"  AI Reason: {response}")
+            
+            # Log the metric
+            log_metric("networking", "Opportunity Found", 1)
+            
             return True
         else:
             print(f"  pass: {event['title']}")

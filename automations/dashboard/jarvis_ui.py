@@ -1,8 +1,10 @@
 import streamlit as st
 import sys
 import os
+import sqlite3
 import psycopg2
 import json
+import pandas as pd
 from datetime import datetime
 
 # Setup paths to import Jarvis core modules
@@ -92,7 +94,7 @@ except Exception as e:
     st.sidebar.warning(f"Database stats unavailable: {e}")
 
 # --- Layout ---
-tab1, tab2 = st.tabs(["💬 Chat", "🧠 Daily Upskill"])
+tab1, tab2, tab3 = st.tabs(["💬 Chat", "🧠 Daily Upskill", "📊 Analytics"])
 
 with tab1:
     # --- Render Chat History ---
@@ -108,6 +110,39 @@ with tab2:
             st.markdown(f.read())
     else:
         st.info("No lesson generated today. Check back tomorrow!")
+
+with tab3:
+    st.header("System Analytics 📈")
+    metrics_db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'metrics.db'))
+    
+    if os.path.exists(metrics_db_path):
+        try:
+            conn_sqlite = sqlite3.connect(metrics_db_path)
+            df = pd.read_sql_query("SELECT category, SUM(count) as total FROM metrics GROUP BY category", conn_sqlite)
+            
+            if not df.empty:
+                st.subheader("Total Automation Events")
+                # Create columns for top-level metrics
+                cols = st.columns(len(df))
+                for idx, row in df.iterrows():
+                    cols[idx].metric(label=row['category'].replace('_', ' ').title(), value=row['total'])
+                
+                st.markdown("---")
+                
+                # Granular breakdown chart
+                df_granular = pd.read_sql_query("SELECT subcategory, count FROM metrics", conn_sqlite)
+                if not df_granular.empty:
+                    df_grouped = df_granular.groupby('subcategory').sum().reset_index()
+                    st.subheader("Event Breakdown")
+                    st.bar_chart(df_grouped.set_index('subcategory'))
+            else:
+                st.info("No metrics logged yet. Let the bots run for a bit!")
+                
+            conn_sqlite.close()
+        except Exception as e:
+            st.error(f"Failed to load analytics: {e}")
+    else:
+        st.info("No metrics database found. Starting automations will create it.")
 
 # --- Chat Input ---
 if prompt := st.chat_input("Ask Jarvis... (e.g. 'What jobs did I apply to today?')"):

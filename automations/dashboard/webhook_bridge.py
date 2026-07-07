@@ -7,7 +7,8 @@ import os
 
 PORT = 5000
 PINTEREST_DIR = "/home/venu/Proposals/Jarvis/automations/pinterest"
-LINKEDIN_DIR = "/home/venu/Proposals/Jarvis/automations/linkedin" # Assuming this exists or will exist
+LINKEDIN_DIR = "/home/venu/Proposals/Jarvis/automations/linkedin-outreach"
+JOBS_DIR = "/home/venu/Proposals/Jarvis/automations/job-automation"
 
 class WebhookHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -37,10 +38,15 @@ class WebhookHandler(http.server.SimpleHTTPRequestHandler):
 
         elif self.path == '/run/linkedin':
             print("🚀 TRIGGER RECEIVED: Starting LinkedIn Bot...")
-            # Placeholder command - update this when LinkedIn bot is ready
-            # cmd = ["venv/bin/python", "main.py"]
-            # subprocess.Popen(cmd, cwd=LINKEDIN_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            cmd = ["python3", "main.py"]
+            subprocess.Popen(cmd, cwd=LINKEDIN_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             response["message"] = "LinkedIn Bot started in the background"
+            
+        elif self.path == '/run/jobs':
+            print("🚀 TRIGGER RECEIVED: Starting Job Auto-Applier...")
+            cmd = ["python3", "run_pipeline.py"]
+            subprocess.Popen(cmd, cwd=JOBS_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            response["message"] = "Job Application Pipeline started in the background"
             
         else:
             self.send_response(404)
