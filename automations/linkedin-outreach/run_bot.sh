@@ -6,4 +6,4 @@ echo "=============================================="
 cd "$(dirname "$0")"
 
 # Execute natively using python3
-python3 -u main.py
+/home/venu/miniconda3/bin/python3 -u main.py

@@ -44,8 +44,8 @@ interview_bot/
 # ==============================================================================
 output/
 prep_sheets/
-*.md
 resume_extracted.txt
+# NOTE: *.md removed 2026-08-01 — product docs (README, SERVICE_OFFERING) must be versioned
 *.pdf
 
 # ==============================================================================
@@ -87,3 +87,10 @@ wd_browser/
 *.exe
 brain/openhuman/
 
+
+
+# Secrets
+.env*
+*.pem
+*.key
+secret.yaml

@@ -132,24 +132,7 @@ def listen_for_interviews():
         print(f"❌ IMAP Error: {e}")
 
 if __name__ == "__main__":
-    print("🚀 Starting 24/7 Email Listener in the background...")
-    print("📬 Checking every 5 minutes for new interview emails")
-    consecutive_errors = 0
-    max_consecutive_errors = 5
-    
-    while True:
-        try:
-            listen_for_interviews()
-            consecutive_errors = 0  # Reset on success
-        except Exception as e:
-            consecutive_errors += 1
-            print(f"Loop error ({consecutive_errors}/{max_consecutive_errors}): {e}")
-            if consecutive_errors >= max_consecutive_errors:
-                print(f"❌ Too many consecutive errors ({max_consecutive_errors}) — sleeping 30 min")
-                time.sleep(1800)
-                consecutive_errors = 0
-        
-        # Wait 5 minutes between checks (faster polling for time-sensitive interviews)
-        # Add jitter so we don't hit Gmail IMAP rate limits at exactly :00 every time
-        jitter = random.uniform(-30, 30)
-        time.sleep(300 + jitter)
+    print("🚀 Starting Email Listener...")
+    print("📬 Checking for new interview emails...")
+    listen_for_interviews()
+    print("✅ Finished checking emails.")

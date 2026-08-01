@@ -23,6 +23,10 @@ import os
 import random
 import time
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv(Path(__file__).parent / ".env")
 
 from scraper import scrape_linkedin_posts, scrape_recruiter_profile
 from extractor import extract_contact_info

@@ -93,8 +93,24 @@ try:
 except Exception as e:
     st.sidebar.warning(f"Database stats unavailable: {e}")
 
+# --- Automate-My-Life Inbox ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("📥 Automate-My-Life Inbox")
+new_task = st.sidebar.text_input("What manual chore should I automate?")
+if st.sidebar.button("Submit Request"):
+    if new_task:
+        try:
+            conn2 = psycopg2.connect(**DB_PARAMS)
+            cur2 = conn2.cursor()
+            cur2.execute("INSERT INTO automation_tasks (task_description) VALUES (%s)", (new_task,))
+            conn2.commit()
+            conn2.close()
+            st.sidebar.success("Task sent to Hermes for processing! Check the Proposals tab.")
+        except Exception as e:
+            st.sidebar.error(f"Failed to submit: {e}")
+
 # --- Layout ---
-tab1, tab2, tab3 = st.tabs(["💬 Chat", "🧠 Daily Upskill", "📊 Analytics"])
+tab1, tab2, tab3, tab4 = st.tabs(["💬 Chat", "🧠 Daily Upskill", "📊 Analytics", "⚡ Automation Proposals"])
 
 with tab1:
     # --- Render Chat History ---
@@ -144,6 +160,72 @@ with tab3:
     else:
         st.info("No metrics database found. Starting automations will create it.")
 
+with tab4:
+    st.header("⚡ Pending Automation Proposals")
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        # Check if table exists first just in case
+        try:
+            df_tasks = pd.read_sql_query("SELECT id, task_description, status, proposed_code, created_at FROM automation_tasks ORDER BY created_at DESC", conn)
+        except Exception:
+            df_tasks = pd.DataFrame()
+        conn.close()
+        
+        if df_tasks.empty:
+            st.info("No automation requests found. Submit a chore in the sidebar inbox!")
+        else:
+            for idx, row in df_tasks.iterrows():
+                with st.expander(f"[{row['status'].upper()}] {row['task_description']} ({row['created_at']})"):
+                    if row['status'] == 'pending':
+                        st.info("Hermes is ready to analyze this request and write the code.")
+                        if st.button("Generate Code via Hermes", key=f"gen_{row['id']}"):
+                            with st.spinner("Hermes is writing the automation code..."):
+                                prompt_text = f"You are Hermes, the lead automation engineer. The user wants to automate: '{row['task_description']}'. Generate a python script to automate this. ONLY output the python code inside ```python blocks. Do not include extra conversational text."
+                                if call_llm:
+                                    llm_result = call_llm(prompt=prompt_text, mode="run", force="local")
+                                    import re
+                                    code_match = re.search(r'```python(.*?)```', llm_result.text, re.DOTALL)
+                                    if code_match:
+                                        proposed_code = code_match.group(1).strip()
+                                    else:
+                                        proposed_code = llm_result.text
+                                    
+                                    conn2 = psycopg2.connect(**DB_PARAMS)
+                                    cur2 = conn2.cursor()
+                                    cur2.execute("UPDATE automation_tasks SET status='draft', proposed_code=%s WHERE id=%s", (proposed_code, row['id']))
+                                    conn2.commit()
+                                    conn2.close()
+                                    st.success("Draft created! Please refresh the page.")
+                                else:
+                                    st.error("LLM Router not available.")
+
+                    elif row['status'] == 'draft':
+                        st.markdown("### 🤖 Hermes Proposed Code")
+                        st.code(row['proposed_code'], language='python')
+                        if st.button("✅ Approve & Deploy", key=f"deploy_{row['id']}"):
+                            import os
+                            import uuid
+                            script_id = str(uuid.uuid4())[:8]
+                            script_path = f"/home/venu/Proposals/Jarvis/automations/hermes-scripts/auto_{script_id}.py"
+                            os.makedirs(os.path.dirname(script_path), exist_ok=True)
+                            with open(script_path, "w") as f:
+                                f.write(row['proposed_code'] or "# Error: No code generated")
+                            
+                            conn2 = psycopg2.connect(**DB_PARAMS)
+                            cur2 = conn2.cursor()
+                            cur2.execute("UPDATE automation_tasks SET status='deployed' WHERE id=%s", (row['id'],))
+                            conn2.commit()
+                            conn2.close()
+                            
+                            st.success(f"Script saved to {script_path} and marked as deployed!")
+                            
+                    elif row['status'] == 'deployed':
+                        st.success("This automation has been deployed.")
+                        with st.expander("View Deployed Code"):
+                            st.code(row['proposed_code'], language='python')
+    except Exception as e:
+        st.error(f"Error loading proposals: {e}")
+
 # --- Chat Input ---
 if prompt := st.chat_input("Ask Jarvis... (e.g. 'What jobs did I apply to today?')"):
     # Add user message to UI
@@ -191,7 +273,7 @@ if prompt := st.chat_input("Ask Jarvis... (e.g. 'What jobs did I apply to today?
             recent_jobs_str = ', '.join(st.session_state.recent_jobs) if st.session_state.recent_jobs else 'None'
             system_stats = f"CURRENT DATE: {today_str}\nSYSTEM CONTEXT:\n- Total Pinterest pins posted: {st.session_state.pin_count}\n- Recent Pins: {recent_pins_str}\n- Total jobs applied to: {st.session_state.job_count}\n- Recent Jobs: {recent_jobs_str}\n"
             
-            sys_prompt = "You are Jarvis (Hermes), an advanced AI assistant. You have full real-time access to the system context. The context provided IS the real-time data, so never say you don't have real-time data and never mention training cutoffs."
+            sys_prompt = f"You are Jarvis (Hermes), an advanced AI assistant. Today's date is {today_str}. You have full real-time access to the system context. The context provided IS the real-time data, do not mention training cutoffs."
             if context:
                 final_prompt = f"{sys_prompt}\n\n{system_stats}\n{context}\n\nUSER QUESTION: {prompt}\n\nINSTRUCTIONS: Answer directly based on the context. If they ask for counts, use the exact numbers. Be concise and conversational.\n\nHERMES:"
             else:

@@ -117,8 +117,12 @@ def scrape_linkedin_posts(job_role):
                 if username and password:
                     try:
                         page.goto("https://www.linkedin.com/login", wait_until="domcontentloaded", timeout=TIMEOUT_MS)
-                        page.fill("id=username", username, timeout=10000)
-                        page.fill("id=password", password, timeout=10000)
+                        if page.locator("id=username").count() > 0:
+                            page.fill("id=username", username, timeout=10000)
+                            page.fill("id=password", password, timeout=10000)
+                        else:
+                            page.fill("id=session_key", username, timeout=10000)
+                            page.fill("id=session_password", password, timeout=10000)
                         page.click("button[type='submit']")
                         # Wait for the redirect away from /login
                         page.wait_for_url(lambda u: "login" not in u, timeout=30000)

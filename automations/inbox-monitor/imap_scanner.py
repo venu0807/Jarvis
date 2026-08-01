@@ -5,6 +5,7 @@ Securely connects to Gmail, scans for unread recruiter emails, and summarizes th
 
 import os
 import sys
+import json
 import email
 from email.header import decode_header
 from email.message import EmailMessage
@@ -44,7 +45,10 @@ PROCESSED_EMAILS_FILE = BASE_DIR / "processed_emails.json"
 def load_processed_emails():
     if PROCESSED_EMAILS_FILE.exists():
         with open(PROCESSED_EMAILS_FILE, "r") as f:
-            return set(json.load(f))
+            try:
+                return set(json.load(f))
+            except json.JSONDecodeError:
+                return set()
     return set()
 
 def save_processed_emails(processed_set):
