@@ -94,3 +94,14 @@ brain/openhuman/
 *.pem
 *.key
 secret.yaml
+
+# ==============================================================================
+# PURGED FROM HISTORY (2026-08-04) - Large files and broken gitlinks
+# ==============================================================================
+automations/pinterest/C:\Users\Venu\AppData\Local/
+automations/pinterest/obscura
+automations/pinterest/obscura-worker
+backups/openclaw-workspace-20260616.tar.gz
+backups/20260614-182854/openclaw.json
+automations/ecommerce/affiliate-store/
+automations/linkedin-outreach/sent_tracker.db
