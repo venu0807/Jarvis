@@ -37,6 +37,7 @@ def test_build_summary_counts_correctly():
     assert summary["totals"]["errors"] == 1
     assert summary["portal_counts"].get("naukri") == 1
 
+@pytest.mark.llm
 def test_tailor_resume_handles_missing_keys():
     """QA Test 3: What if the job dictionary is missing critical keys?"""
     job = {"company": "TestCorp"} # Missing title, description
@@ -49,6 +50,7 @@ def test_env_secrets_are_loaded():
     email = os.getenv("WELLFOUND_EMAIL", os.getenv("GMAIL_ADDRESS", ""))
     assert email is not None
 
+@pytest.mark.llm
 def test_resume_tailor_compilation_safety():
     """Security/QA Test: Ensure latex payload injection is escaped properly."""
     # Test that malicious ampersands or latex injection gets stripped/escaped
