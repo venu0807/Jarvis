@@ -17,14 +17,14 @@ class CutshortPortal(BasePortal):
 
     async def login(self, page: Page) -> bool:
         try:
-            await page.goto(self.base_url, wait_until="networkidle", timeout=TIMEOUT)
+            await page.goto(self.base_url, wait_until="domcontentloaded", timeout=TIMEOUT)
             await page.wait_for_timeout(1500)
 
             if await self._is_logged_in(page):
                 print("  ✅ Cutshort: session active — skipping login")
                 return True
 
-            await page.goto(self.login_url, wait_until="networkidle", timeout=TIMEOUT)
+            await page.goto(self.login_url, wait_until="domcontentloaded", timeout=TIMEOUT)
             await page.wait_for_timeout(2000)
 
             # Close cookie banner if present

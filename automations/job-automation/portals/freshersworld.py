@@ -11,9 +11,10 @@ TIMEOUT = 45_000
 
 # City name mapping for URL construction
 CITY_MAP = {
-    "delhi": "delhi", "noida": "noida", "greater noida": "greater-noida",
-    "gurugram": "gurgaon", "gurgaon": "gurgaon", "hyderabad": "hyderabad",
-    "bangalore": "bangalore", "bengaluru": "bangalore"
+    "gurugram": "gurgaon", "gurgaon": "gurgaon", 
+    "noida": "noida", "greater noida": "greater-noida",
+    "delhi": "delhi", 
+    "hyderabad": "hyderabad", "bangalore": "bangalore", "bengaluru": "bangalore"
 }
 
 
@@ -31,7 +32,7 @@ class FreshersworldPortal(BasePortal):
                 print("  ✅ Freshersworld: session active — skipping login")
                 return True
 
-            await page.goto(self.login_url, wait_until="networkidle", timeout=TIMEOUT)
+            await page.goto(self.login_url, wait_until="domcontentloaded", timeout=TIMEOUT)
             await page.wait_for_timeout(2000)
 
             # Close any popup

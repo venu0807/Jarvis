@@ -24,7 +24,7 @@ class WellfoundPortal(BasePortal):
                 print("  ✅ Wellfound: session active — skipping login")
                 return True
 
-            await page.goto(self.login_url, wait_until="networkidle", timeout=TIMEOUT)
+            await page.goto(self.login_url, wait_until="domcontentloaded", timeout=TIMEOUT)
             await page.wait_for_timeout(2000)
 
             try:

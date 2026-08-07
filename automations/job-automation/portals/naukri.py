@@ -30,7 +30,7 @@ ROLES = [
     "SDE",
     "Software Development Engineer",
 ]
-CITIES = ["Delhi", "Noida", "Greater Noida", "Gurugram", "Hyderabad", "Bangalore"]
+CITIES = ["Gurugram", "Noida", "Greater Noida", "Delhi", "Hyderabad", "Bangalore"]
 
 
 class NaukriPortal(BasePortal):
@@ -512,6 +512,8 @@ class NaukriPortal(BasePortal):
                 ".apply-button button",
                 "#apply-button",
                 "[class*='applyBtn']",
+                "[id*='apply']",
+                "button[id*='apply']",
                 "a:has-text('Apply Now')",
             ]:
                 try:
@@ -533,17 +535,37 @@ class NaukriPortal(BasePortal):
                     continue
 
             if apply_btn is None:
+                # ── JS Fallback for Apply Button ──
+                try:
+                    js_clicked = await page.evaluate("""() => {
+                        const btns = Array.from(document.querySelectorAll('button, a, [role="button"], div, span'));
+                        for (const b of btns) {
+                            const t = (b.innerText || '').trim().toLowerCase();
+                            if (t === 'apply' || t === 'quick apply' || t === 'apply now') {
+                                b.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    }""")
+                    if js_clicked:
+                        print("  [JS Fallback] Clicked Apply button via JS")
+                        apply_btn = True
+                        await page.wait_for_timeout(2500)
+                except:
+                    pass
+
+            if apply_btn is None:
                 print("  [Vision Fallback] Attempting to click Apply using AI Vision...")
                 try:
-                    if hasattr(page, 'fallback'):
-                        await page.fallback("Click the Apply or Quick Apply button.")
-                        await page.wait_for_timeout(2500)
-                    else:
-                        return ApplicationResult(job=job, status="skipped", reason="No Apply button found")
+                    from shared_dom_llm import solve_with_dom_async
+                    await solve_with_dom_async(page, "Click the Apply or Quick Apply button.")
+                    await page.wait_for_timeout(2500)
+                    apply_btn = True
                 except Exception as fe:
                     print(f"  ⚠️  Vision fallback failed: {fe}")
                     return ApplicationResult(job=job, status="skipped", reason="No Apply button found")
-            else:
+            elif apply_btn is not True:
                 await apply_btn.click()
                 await page.wait_for_timeout(2500)
 
@@ -608,7 +630,8 @@ class NaukriPortal(BasePortal):
                     "[class*='Drawer']:not([class*='gNb'])",
                     "[class*='drawer']:not([class*='gNb'])",
                     "[class*='modal']", "[class*='popup']", "[class*='dialog']",
-                    ".side-panel"
+                    ".side-panel",
+                    "[class*='slideOut']", ".layerWrapper", ".modal-content", "[class*='drawer-content']"
                 ]:
                     try:
                         el = page.locator(sel).first

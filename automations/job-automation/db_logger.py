@@ -1,5 +1,8 @@
+import os
 import sqlite3
 import datetime
+import json
+import psycopg2
 from pathlib import Path
 from portals.base import ApplicationResult
 
@@ -55,3 +58,27 @@ def save_jobs_to_db(results: list[ApplicationResult]):
             except Exception as e:
                 print(f"⚠️ Could not insert job {job.get('id', 'unknown')} into DB: {e}")
         conn.commit()
+
+    # Sync to PostgreSQL if applied successfully
+    applied_results = [r for r in results if r.status == "applied"]
+    if applied_results:
+        try:
+            pg_conn = psycopg2.connect(
+                dbname=os.getenv("PG_DB", "pinterest_db"),
+                user=os.getenv("PG_USER", "venu"),
+                password=os.getenv("PG_PASSWORD", ""),
+                host=os.getenv("PG_HOST", "127.0.0.1"),
+            )
+            pg_cur = pg_conn.cursor()
+            for r in applied_results:
+                job_payload = json.dumps(r.job)
+                pg_cur.execute(
+                    "INSERT INTO events (source, event_type, payload) VALUES (%s, %s, %s)",
+                    ("job_bot", "jobs.applied", job_payload)
+                )
+            pg_conn.commit()
+            pg_cur.close()
+            pg_conn.close()
+            print(f"✅ Synced {len(applied_results)} applied jobs to PostgreSQL (events table).")
+        except Exception as e:
+            print(f"⚠️ Failed to sync to PostgreSQL: {e}")

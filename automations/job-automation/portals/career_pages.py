@@ -73,11 +73,11 @@ ROLE_KEYWORDS = {
 }
 
 CITY_KEYWORDS = {
-    "Delhi":          ["delhi", "gurgaon", "noida", "new delhi"],
+    "Gurugram":       ["gurgaon", "gurugram"],
     "Noida":          ["noida"],
     "Greater Noida":  ["greater noida"],
-    "Gurugram":       ["gurugram", "gurgaon"],
-    "Hyderabad":      ["hyderabad", "secunderabad"],
+    "Delhi":          ["delhi", "new delhi"],
+    "Hyderabad":      ["hyderabad", "telangana"],
     "Bangalore":      ["bangalore", "bengaluru"],
 }
 
@@ -106,7 +106,7 @@ def _matches_city(location: str, target_city: str) -> bool:
 # ── Aggregator fetchers ────────────────────────────────────────────────────────
 
 def _load_company_catalog() -> dict:
-    """Load C:\...\companies.json, return {key: {...metadata...}}."""
+    r"""Load C:\...\companies.json, return {key: {...metadata...}}."""
     if not COMPANY_CATALOG.exists():
         return {}
     try:
