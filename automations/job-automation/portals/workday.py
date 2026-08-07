@@ -388,7 +388,7 @@ class WorkdayPortal:
         """Sync search wrapped in async — Playwright apply happens here too."""
         import asyncio
         from .base import ApplicationResult
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         # Run the search synchronously in a thread → returns list of jobs
         jobs = await loop.run_in_executor(
             None,
@@ -399,7 +399,6 @@ class WorkdayPortal:
             j["portal"] = "Workday"
         # Apply each (Playwright form fill) — capped to daily_limit per company
         per_company = {}
-        from .base import ApplicationResult as _AR
         results = []
         profile = _load_profile_dict()
         resume_pdf = _resolve_resume_path()
@@ -414,12 +413,10 @@ class WorkdayPortal:
             )
             per_company[tenant] += 1
             status = "applied" if success else "manual"
-            results.append(_AR(
+            results.append(ApplicationResult(
                 job=j,
                 status=status,
                 reason=msg,
-                applied_at=None,
-                portal_name="Workday",
             ))
         return results
 

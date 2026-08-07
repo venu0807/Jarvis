@@ -45,8 +45,10 @@ def is_experienced_role(title: str, description: str = "") -> bool:
         if int(match[0]) >= 1:  # Skip if minimum experience is 1+ years
             return True
             
-    # Check for raw "X years experience" without the "+" or "to"
-    raw_exp = re.findall(r'([0-9]+)\s*(?:years?|yrs?)(?:\s+of)?\s+experience', text)
+    # Check for raw "X years experience" without the "+" or "to".
+    # Lookbehind blocks the upper bound of a range ("0-1 years", "0 to 1 years")
+    # from being misread as a standalone "1 years" requirement.
+    raw_exp = re.findall(r'(?<![0-9-])(?<!to )([0-9]+)\s*(?:years?|yrs?)(?:\s+of)?(?:\s+(?:work|professional))?\s+experience', text)
     for match in raw_exp:
         if int(match) >= 1:
             return True

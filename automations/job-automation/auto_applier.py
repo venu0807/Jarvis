@@ -39,7 +39,7 @@ from jarvis_browser import AsyncBrowser, safe_close_async
 # the catalog covers ~10k companies custom-ATS placeholders included.
 # Re-enabling a cut portal: rerun scripts/apply_portal_cuts.py --restore <name>
 # (kept as a noop harness if the cut script is removed; restoration is manual).
-from portals import (NaukriPortal, IntersahalaPortal, IndeedPortal,
+from portals import (NaukriPortal, InternshalaPortal, IndeedPortal,
                      FounditPortal, CutshortPortal,
                      FreshersworldPortal, WellfoundPortal, CareerPagePortal, WorkdayPortal)
 from portals.base import ApplicationResult
@@ -100,8 +100,7 @@ intern_roles = list(set([r for r in intern_roles if r])) # Deduplicate
 ROLES.extend(intern_roles)
 
 CITIES = [
-    "Delhi", "Noida", "Greater Noida",
-    "Gurugram", "Hyderabad", "Bangalore",
+    "Gurugram", "Noida", "Greater Noida", "Delhi", "Hyderabad", "Bangalore",
 ]
 
 CREDS = {
@@ -380,7 +379,7 @@ async def main():
 
     portal_map = {
         "naukri":        NaukriPortal,
-        "internshala":   IntersahalaPortal,
+        "internshala":   InternshalaPortal,
         "indeed":        IndeedPortal,
         "foundit":       FounditPortal,
         "cutshort":      CutshortPortal,
@@ -441,92 +440,6 @@ async def main():
         for pname, count in summary["portal_counts"].items():
             print(f"   {pname}: {count}")
 
-    return summary
-
-
-async def main_with_jobs(jobs: list) -> dict:
-    """
-    Called directly by run_pipeline.py with pre-scraped jobs.
-    Returns the summary dict (so run_pipeline can do resume tailoring before notifying).
-    """
-    import sys
-    # Inject --job-file equivalent by temporarily writing to a temp file
-    today = datetime.date.today().isoformat()
-    tmp_path = BASE_DIR / "output" / f"jobs_{today}.json"
-    tmp_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path.write_text(json.dumps(jobs, ensure_ascii=False), encoding="utf-8")
-
-    # Patch sys.argv so argparse in main() picks up the job file
-    old_argv = sys.argv[:]
-    sys.argv = [sys.argv[0], "--job-file", str(tmp_path)]
-    try:
-        result = await _run(jobs)
-    finally:
-        sys.argv = old_argv
-    return result
-
-
-async def _run(jobs: list, is_headless: bool = HEADLESS) -> dict:
-    """Core apply logic used by both main() and main_with_jobs()."""
-    today = datetime.date.today().isoformat()
-    print(f"""
-╔══════════════════════════════════════════════════╗
-║   🦞 OpenClaw Auto-Apply Engine                  ║
-║   {os.getenv('USER_FULL_NAME', 'User Name').ljust(46)} ║
-║   Date:  {today}                       ║
-║   Limit: {DAILY_LIMIT}/portal/day                        ║
-╚══════════════════════════════════════════════════╝
-""")
-
-    portal_map = {
-        "naukri":        NaukriPortal,
-        "internshala":   IntersahalaPortal,
-        "indeed":        IndeedPortal,
-        "foundit":       FounditPortal,
-        "cutshort":      CutshortPortal,
-        "freshersworld": FreshersworldPortal,
-        "wellfound":     WellfoundPortal,
-        "career_pages":  CareerPagePortal,
-        "workday":       WorkdayPortal,
-    }
-
-    all_results: list = []
-
-    async with AsyncBrowser(headless=is_headless) as browser_mgr:
-        for name, cls in portal_map.items():
-            session_file = SESSION_DIR / f"{name}.json"
-            if session_file.exists():
-                print(f"\n💾 {name}: loading saved session")
-            context = await browser_mgr.new_context_with_session(session_file)
-            try:
-                results = await run_portal(name, cls, jobs, context)
-                all_results.extend(results)
-                await browser_mgr.save_session(context, session_file)
-            except Exception as e:
-                print(f"\n❌ {name} portal crashed: {e}")
-            finally:
-                await safe_close_async(context)
-
-    # Save all scraped jobs to the SQLite Database (for Interview Prep Bot)
-    try:
-        save_jobs_to_db(all_results)
-    except Exception as dbe:
-        print(f"\n⚠️  Could not save to local database: {dbe}")
-
-    summary = build_summary(all_results)
-    log_path = LOG_DIR / f"applications_{today}.json"
-    log_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"\n📊 Summary saved → {log_path}")
-
-    t = summary["totals"]
-    print(f"""
-╔══════════════════════════════════════════════════╗
-║   Auto-Apply Results:                            ║
-║   Auto-applied:   {str(t['applied']).ljust(5)} jobs                  ║
-║   Apply manually: {str(t['manual_total']).ljust(5)} jobs                  ║
-║   Errors:         {str(t['errors']).ljust(5)}                        ║
-╚══════════════════════════════════════════════════╝
-""")
     return summary
 
 

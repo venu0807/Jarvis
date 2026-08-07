@@ -1,0 +1,20 @@
+# Standalone safety net — root /Jarvis/.gitignore already covers these,
+# but keep this if the folder is ever extracted into its own repo.
+
+# Secrets
+.env
+.env.bak
+
+# Browser sessions (login cookies)
+.sessions/
+.sessions_backup/
+
+# Python
+__pycache__/
+*.pyc
+
+# Generated outputs
+output/
+scratch/
+indeed_debug.png
+naukri_headless_error.png

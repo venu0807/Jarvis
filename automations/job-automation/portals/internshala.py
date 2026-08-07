@@ -20,7 +20,7 @@ GENERIC_COVER_LETTER = (
 )
 
 
-class IntersahalaPortal(BasePortal):
+class InternshalaPortal(BasePortal):
     name = "Internshala"
     base_url = "https://internshala.com"
     login_url = "https://internshala.com/login/student"
@@ -192,7 +192,7 @@ class IntersahalaPortal(BasePortal):
 
     async def apply_to_job(self, page: Page, job: dict) -> ApplicationResult:
         try:
-            await page.goto(job["url"], wait_until="networkidle", timeout=TIMEOUT)
+            await page.goto(job["url"], wait_until="domcontentloaded", timeout=TIMEOUT)
             await page.wait_for_timeout(random.uniform(2000, 3000))
 
             # --- Extract Job Description ---

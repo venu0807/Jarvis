@@ -41,7 +41,7 @@ from portals import (
     FounditPortal,
     IndeedPortal,
     CutshortPortal,
-    IntersahalaPortal,
+    InternshalaPortal,
     FreshersworldPortal,
     WellfoundPortal,
 )
@@ -51,7 +51,7 @@ _GMAIL = os.getenv("GMAIL_ADDRESS", "")
 PORTALS = [
     ("foundit",       FounditPortal,       _GMAIL, os.getenv("FOUNDIT_PASSWORD",       "")),
     ("indeed",        IndeedPortal,        _GMAIL, os.getenv("INDEED_PASSWORD",        "")),
-    ("internshala",   IntersahalaPortal,   _GMAIL, os.getenv("INTERNSHALA_PASSWORD",   "")),
+    ("internshala",   InternshalaPortal,   _GMAIL, os.getenv("INTERNSHALA_PASSWORD",   "")),
     ("cutshort",      CutshortPortal,      _GMAIL, os.getenv("CUTSHORT_PASSWORD",      "")),
     ("freshersworld", FreshersworldPortal, _GMAIL, os.getenv("FRESHERSWORLD_PASSWORD", "")),
     ("wellfound",     WellfoundPortal,     _GMAIL, os.getenv("WELLFOUND_PASSWORD",     "")),

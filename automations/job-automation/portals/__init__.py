@@ -26,7 +26,7 @@ That removes the staging directory and the script itself.
 """
 
 from .naukri import NaukriPortal
-from .internshala import IntersahalaPortal
+from .internshala import InternshalaPortal
 from .indeed import IndeedPortal
 from .foundit import FounditPortal
 from .cutshort import CutshortPortal
@@ -37,7 +37,7 @@ from .workday import WorkdayPortal
 
 __all__ = [
     "NaukriPortal",
-    "IntersahalaPortal",
+    "InternshalaPortal",
     "IndeedPortal",
     "FounditPortal",
     "CutshortPortal",
