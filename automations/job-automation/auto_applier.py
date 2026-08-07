@@ -9,7 +9,6 @@ import argparse
 import datetime
 import json
 import os
-import random
 import sys
 from pathlib import Path
 
@@ -23,13 +22,6 @@ BASE_DIR = Path(__file__).parent
 sys.path.append(str(BASE_DIR.parent))
 sys.path.append(str(BASE_DIR.parent.parent))
 
-try:
-    from event_bus import get_bus
-    from policy import call_llm
-except ImportError:
-    get_bus = None
-    call_llm = None
-
 from dotenv import load_dotenv
 from jarvis_browser import AsyncBrowser, safe_close_async
 
@@ -42,44 +34,10 @@ from jarvis_browser import AsyncBrowser, safe_close_async
 from portals import (NaukriPortal, InternshalaPortal, IndeedPortal,
                      FounditPortal, CutshortPortal,
                      FreshersworldPortal, WellfoundPortal, CareerPagePortal, WorkdayPortal)
-from portals.base import ApplicationResult
 from db_logger import save_jobs_to_db
 
 # ── Load .env ─────────────────────────────────────────────────────────────────
 load_dotenv(Path(__file__).parent / ".env")
-
-# ── Constants ─────────────────────────────────────────────────────────────────
-
-def evaluate_job_fit(job: dict) -> bool:
-    """Use OpenClaw/LLM to decide if we should apply to this job."""
-    if not call_llm:
-        return True  # Apply blindly if LLM is unavailable
-        
-    desc = job.get("description", "")
-    if not desc or len(desc) < 50:
-        return True
-        
-    prompt = f"""
-Evaluate this job description for a Full Stack AI Engineer / Python Developer.
-Criteria for REJECTION (Reply NO if any match):
-- Requires strictly 2+ years of professional industry experience (Candidate only has 0-1 years of experience / fresh graduate).
-- Requires C#, Ruby, PHP, or Go as the primary language (Candidate uses Python, Java, React).
-- Is a non-technical role (e.g., Sales, HR, Marketing, Customer Support).
-
-Reply with EXACTLY ONE WORD: "YES" if it's a good fit, or "NO" if it's a bad fit.
-
-Job Description:
-{desc[:2000]}
-"""
-    try:
-        res = call_llm(prompt, mode="run", force="local", pii_acknowledged=True, task_label="job_filter")
-        reply = res.text.strip().upper()
-        if "NO" in reply[:10]:
-            return False
-    except Exception as e:
-        print(f"  ⚠️  LLM filter failed: {e}")
-        
-    return True
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DAILY_LIMIT = int(os.getenv("DAILY_LIMIT", "15"))   # max applies per portal
@@ -141,7 +99,7 @@ def save_applied(new_ids: set):
 
 # ── Portal runner ─────────────────────────────────────────────────────────────
 
-async def run_portal(portal_name: str, portal_cls, jobs: list, context) -> list:
+async def run_portal(portal_name: str, portal_cls, context) -> list:
     cred = CREDS[portal_name]
     # Skip credential check for portals that don't need auth (Workday, CareerPages)
     if portal_name not in ("workday", "career_pages"):
@@ -151,7 +109,6 @@ async def run_portal(portal_name: str, portal_cls, jobs: list, context) -> list:
 
     portal  = portal_cls(email=cred["email"], password=cred["password"])
     page    = await context.new_page()
-    results = []
 
     print(f"\n{'='*54}\n🌐 Portal: {portal.name}\n{'='*54}")
 
@@ -161,103 +118,30 @@ async def run_portal(portal_name: str, portal_cls, jobs: list, context) -> list:
         if not logged_in:
             return []
 
-        # ── Naukri: Playwright-based search after login ───────────────────────────
+        # ── Live search + apply ───────────────────────────────────────────────────
+        # All 9 portals implement search_and_apply(page, roles, cities,
+        # daily_limit, applied_today). Naukri additionally takes context= for
+        # page-recovery on crash; the others don't. (Previously this was 6
+        # copy-pasted branches + a scraped-jobs fallback that was dead in the
+        # daily run because `jobs` was always empty without --job-file — which
+        # silently disabled cutshort/freshersworld/wellfound.)
+        #
+        # Optional LLM job-fit filter — opt-in via LLM_FILTER=1. None by
+        # default, so portal behavior is unchanged unless explicitly enabled.
+        from portals.fit_filter import make_filter
+        job_filter = make_filter(enabled=os.getenv("LLM_FILTER", "0") == "1")
+
+        applied_today = load_applied()
         if portal_name == "naukri":
-            applied_today = load_applied()
-            naukri_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today, context=context)
-            save_applied({r.job["id"] for r in naukri_results if r.status == "applied"})
-            return naukri_results
-
-        # ── Indeed: Playwright-based search after login ───────────────────────────
-        if portal_name == "indeed":
-            applied_today = load_applied()
-            indeed_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
-            save_applied({r.job["id"] for r in indeed_results if r.status == "applied"})
-            return indeed_results
-
-        # ── Internshala: Playwright-based search after login ──────────────────────
-        if portal_name == "internshala":
-            applied_today = load_applied()
-            internshala_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
-            save_applied({r.job["id"] for r in internshala_results if r.status == "applied"})
-            return internshala_results
-
-        # ── CareerPages: company career pages (aggregator JSON APIs) ──────────────
-        if portal_name == "career_pages":
-            applied_today = load_applied()
-            career_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
-            save_applied({r.job["id"] for r in career_results if r.status == "applied"})
-            return career_results
-
-        # ── Foundit: Playwright-based search after login ──────────────────────────
-        if portal_name == "foundit":
-            applied_today = load_applied()
-            foundit_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
-            save_applied({r.job["id"] for r in foundit_results if r.status == "applied"})
-            return foundit_results
-
-        # ── Workday: public search + Playwright apply ─────────────────────────────
-        if portal_name == "workday":
-            applied_today = load_applied()
-            workday_results = await portal.search_and_apply(page, ROLES, CITIES, DAILY_LIMIT, applied_today)
-            save_applied({r.job["id"] for r in workday_results if r.status == "applied"})
-            return workday_results
-
-        # ── Other portals: use scraped jobs list ──────────────────────────────────
-        applied_today  = load_applied()
-        applied_count  = 0
-        portal_jobs    = [j for j in jobs if j.get("portal", "").lower() == portal_name.lower()]
-        print(f"  📋 {len(portal_jobs)} scraped jobs for {portal.name}")
-
-        for job in portal_jobs:
-            if applied_count >= DAILY_LIMIT:
-                print(f"  ✋ Daily limit of {DAILY_LIMIT} reached for {portal.name}")
-                break
-            if job["id"] in applied_today:
-                print(f"  ⏭️  Already applied: {job['title']} @ {job['company']}")
-                continue
-
-            print(f"\n  → {job['title']} @ {job['company']} ({job['location']})")
-            
-            # AI Commander: Evaluate Job Fit
-            print(f"     🧠 AI Commander analyzing job fit...")
-            if not evaluate_job_fit(job):
-                print(f"     ❌ Skipped: AI Commander rejected (bad fit)")
-                # Mock result for skipped
-                from portals.base import ApplicationResult
-                results.append(ApplicationResult(job=job, status="skipped", reason="AI Commander rejected"))
-                continue
-                
-            result = await portal.apply_to_job(page, job)
-            results.append(result)
-
-            if result.status == "applied":
-                applied_count += 1
-                applied_today.add(job["id"])
-                save_applied({job["id"]})
-                
-                # Publish event to the unified Jarvis Event Bus
-                if get_bus:
-                    try:
-                        bus = get_bus()
-                        bus.publish("jobs.*", "jobs.applied", {
-                            "portal": portal.name,
-                            "company": job["company"],
-                            "title": job["title"],
-                            "job_id": job["id"],
-                            "location": job.get("location", "")
-                        })
-                    except Exception as e:
-                        print(f"  ⚠️ Could not publish event: {e}")
-            elif result.status == "manual":
-                print(f"     📋 Manual: {result.reason}")
-            elif result.status == "skipped":
-                print(f"     ⏭️  Skipped: {result.reason}")
-            elif result.status == "error":
-                print(f"     ❌ Error: {result.reason}")
-
-            await asyncio.sleep(random.uniform(4, 8))
-
+            results = await portal.search_and_apply(
+                page, ROLES, CITIES, DAILY_LIMIT, applied_today,
+                context=context, job_filter=job_filter
+            )
+        else:
+            results = await portal.search_and_apply(
+                page, ROLES, CITIES, DAILY_LIMIT, applied_today, job_filter=job_filter
+            )
+        save_applied({r.job["id"] for r in results if r.status == "applied"})
         return results
 
     finally:
@@ -347,20 +231,12 @@ def build_summary(all_results: list) -> dict:
 
 async def main():
     parser = argparse.ArgumentParser(description="OpenClaw Auto-Apply Engine")
-    parser.add_argument("--job-file", help="Path to scraped jobs JSON (optional — skips scraping)")
     parser.add_argument("--portal",   help="Run one portal only: naukri|internshala|indeed|foundit|cutshort|freshersworld|wellfound|career_pages|workday")
     parser.add_argument("--headful",  action="store_true", help="Run with a visible browser (overrides HEADLESS=.env)")
     args = parser.parse_args()
 
-    jobs: list = []
-    if args.job_file:
-        job_path = Path(args.job_file)
-        if job_path.exists():
-            jobs = json.loads(job_path.read_text(encoding="utf-8"))
-            print(f"\n📋 Loaded {len(jobs)} scraped jobs from {job_path.name}")
-
     today = datetime.date.today().isoformat()
-    
+
     # [Staff Engineer Refactor]: Removed global mutation of HEADLESS. Passed explicitly.
     is_headless = HEADLESS
     if args.headful:
@@ -404,7 +280,7 @@ async def main():
             context = await browser_mgr.new_context_with_session(session_file)
 
             try:
-                results = await run_portal(name, cls, jobs, context)
+                results = await run_portal(name, cls, context)
                 all_results.extend(results)
                 await browser_mgr.save_session(context, session_file)
             except Exception as e:

@@ -102,7 +102,7 @@ class FounditPortal(BasePortal):
             print(f"     ❌ Foundit apply error: {e}")
             return ApplicationResult(job, "error", str(e))
 
-    async def search_and_apply(self, page: Page, roles: list, cities: list, daily_limit: int, applied_today: set) -> list:
+    async def search_and_apply(self, page: Page, roles: list, cities: list, daily_limit: int, applied_today: set, job_filter=None) -> list:
         """
         Searches for jobs and applies to them.
         """
@@ -164,7 +164,10 @@ class FounditPortal(BasePortal):
                         if is_experienced_role(title, ""):
                             print(f"     ⏭️  Skipped: Requires experience (not fresher/intern)")
                             continue
-                        
+                        if job_filter is not None and not await job_filter(job):
+                            print(f"     ⏭️  Skipped: LLM fit filter rejected")
+                            continue
+
                         # Some versions of Foundit have quick apply directly on the card
                         quick_apply_btn = card.locator("button:has-text('Quick Apply')")
                         if await quick_apply_btn.count() > 0:

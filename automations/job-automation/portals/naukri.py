@@ -110,7 +110,7 @@ class NaukriPortal(BasePortal):
     # ── Playwright-based job search (bypasses anti-scrape) ────────────────────
 
     async def search_and_apply(self, page: Page, roles: list, cities: list, daily_limit: int,
-                                applied_today: set, context=None) -> list:
+                                applied_today: set, context=None, job_filter=None) -> list:
         """
         Search Naukri for fresh jobs via Playwright after login.
         Returns list of ApplicationResult objects.
@@ -194,6 +194,9 @@ class NaukriPortal(BasePortal):
                         }
 
                         print(f"\n  → {title} @ {company} ({city})")
+                        if job_filter is not None and not await job_filter(job):
+                            print(f"     ⏭️  Skipped: LLM fit filter rejected")
+                            continue
                         try:
                             result = await self.apply_to_job(page, job)
                             results.append(result)

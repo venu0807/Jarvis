@@ -34,7 +34,6 @@ This module dispatches based on the prefix to the right endpoint.
 from __future__ import annotations
 
 import json
-import os
 import re
 import sys
 from pathlib import Path
@@ -43,47 +42,8 @@ from typing import Optional
 import requests
 
 
-# ── User profile (from ~/.jarvis/automations/job-automation/.env) ──────────
-def _load_profile() -> dict:
-    """Read user contact info from project .env. Tightened copy with
-    fail-soft defaults so missing .env vars never crash apply."""
-    env_path = Path(__file__).parents[2] / ".env"
-    out = {
-        "first_name": "",
-        "last_name": "",
-        "email": "",
-        "phone": "",
-        "linkedin": "",
-        "resume_pdf": "",
-    }
-    if not env_path.exists():
-        return out
-    for raw in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if "=" not in line:
-            continue
-        k, _, v = line.partition("=")
-        v = v.strip().strip('"').strip("'")
-        if k == "USER_FULL_NAME":
-            parts = v.split(maxsplit=1)
-            out["first_name"] = parts[0] if parts else ""
-            out["last_name"] = parts[1] if len(parts) > 1 else ""
-        elif k == "GMAIL_ADDRESS":
-            out["email"] = v
-        elif k == "USER_EMAIL" and not out["email"]:
-            out["email"] = v
-        elif k == "USER_PHONE":
-            out["phone"] = v
-        elif k == "USER_LINKEDIN_URL":
-            out["linkedin"] = v
-        elif k == "RESUME_PDF_PATH":
-            out["resume_pdf"] = v
-    return out
-
-
-_PROFILE = _load_profile()
+# ── User profile (from portals/profile.py — single parser, used by workday too) ─
+from .profile import _PROFILE, resolve_resume_path as _resolve_resume_path
 
 
 # ── Apply endpoints per aggregator ─────────────────────────────────────────
@@ -132,24 +92,6 @@ def parse_id(job_id: str) -> tuple[str, dict]:
         slug, _, gid = rest.partition("_")
         return "recruitee", {"slug": slug, "id": gid}
     return "manual", {}
-
-
-def _resolve_resume_path() -> Optional[str]:
-    """Where the user's resume PDF lives. Honor env override, fall back to
-    the resume_tailor pipeline default."""
-    explicit = _PROFILE.get("resume_pdf") or os.environ.get("RESUME_PDF_PATH")
-    if explicit and Path(explicit).exists():
-        return explicit
-    default = Path(os.path.expanduser("~")) / "V" / "VenuGopalReddy-Palugulla-AI-Resume.pdf"
-    if default.exists():
-        return str(default)
-    # Last resort: any *.pdf under the resume_tailor output dir
-    out_dir = Path(__file__).parents[2] / "output" / "resumes"
-    if out_dir.exists():
-        pdfs = sorted(out_dir.glob("*.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)
-        if pdfs:
-            return str(pdfs[0])
-    return None
 
 
 def _apply_greenhouse(payload: dict, profile: dict, resume_path: Optional[str]) -> tuple[bool, str]:

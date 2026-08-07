@@ -2,7 +2,6 @@ import os
 import sqlite3
 import datetime
 import json
-import psycopg2
 from pathlib import Path
 from portals.base import ApplicationResult
 
@@ -59,14 +58,17 @@ def save_jobs_to_db(results: list[ApplicationResult]):
                 print(f"⚠️ Could not insert job {job.get('id', 'unknown')} into DB: {e}")
         conn.commit()
 
-    # Sync to PostgreSQL if applied successfully
+    # Sync to PostgreSQL if applied successfully — only when explicitly
+    # configured (PG_PASSWORD set). Previously defaulted to pinterest_db with
+    # an empty password, silently writing job data to the wrong DB.
     applied_results = [r for r in results if r.status == "applied"]
-    if applied_results:
+    if applied_results and os.getenv("PG_PASSWORD"):
         try:
+            import psycopg2  # optional — job DB must work without PG
             pg_conn = psycopg2.connect(
                 dbname=os.getenv("PG_DB", "pinterest_db"),
                 user=os.getenv("PG_USER", "venu"),
-                password=os.getenv("PG_PASSWORD", ""),
+                password=os.getenv("PG_PASSWORD"),
                 host=os.getenv("PG_HOST", "127.0.0.1"),
             )
             pg_cur = pg_conn.cursor()
@@ -82,3 +84,5 @@ def save_jobs_to_db(results: list[ApplicationResult]):
             print(f"✅ Synced {len(applied_results)} applied jobs to PostgreSQL (events table).")
         except Exception as e:
             print(f"⚠️ Failed to sync to PostgreSQL: {e}")
+    elif applied_results:
+        print("ℹ️  PG_PASSWORD not set — skipping PostgreSQL sync (jobs saved to output/jobs.db)")

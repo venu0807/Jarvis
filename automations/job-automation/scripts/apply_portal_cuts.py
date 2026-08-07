@@ -11,8 +11,12 @@ What this script does NOW: archives a one-cycle retention strategy.
   - --restore <name> : not yet implemented; portals/*.py for the cut ones
                        are in .cut-2026-06-15/ for one cycle. To restore,
                        copy back and re-add the entries to auto_applier.py
-                       (portal_map × 2, run_portal() if-branch, imports,
-                       CREDS). This script is the GUIDE for that.
+                       (portal_map, imports, CREDS) — the restored class MUST
+                       implement search_and_apply(page, roles, cities,
+                       daily_limit, applied_today, job_filter=None), because
+                       run_portal now dispatches EVERY portal through it (the
+                       old per-portal if-branches are gone). This script is
+                       the GUIDE for that.
 
 To delete this script altogether:
   python scripts/apply_portal_cuts.py --finalize
@@ -47,9 +51,11 @@ def status():
     print("Restoration steps (manual):")
     print("  1. cp .cut-<date>/<portal>.py portals/")
     print("  2. add to portals/__init__.py imports + __all__")
-    print("  3. add to auto_applier.py: imports, CREDS, both portal_maps, run_portal() branch")
-    print("  4. python scripts/validate_sessions.py --reauth <portal>")
-    print("  5. python scripts/portal_rates.py  (will track new portal's stats)")
+    print("  3. add to auto_applier.py: imports, CREDS, portal_map")
+    print("  4. ensure the portal class implements search_and_apply() — run_portal")
+    print("     dispatches every portal through it (no per-portal branch)")
+    print("  5. python scripts/validate_sessions.py --reauth <portal>")
+    print("  6. python scripts/portal_rates.py  (will track new portal's stats)")
 
 
 def restore(name: str):
@@ -68,9 +74,10 @@ def restore(name: str):
     print(f"  • edit portals/__init__.py — uncomment the '{name}' line if it has one + add to __all__")
     print(f"  • edit auto_applier.py:")
     print(f"      + CREDS['{name}']")
-    print(f"      + portal_map['{name}'] = {name.capitalize()}Portal   (×2 entries)")
-    print(f"      + run_portal() if-branch for portal_name == '{name}'")
+    print(f"      + portal_map['{name}'] = {name.capitalize()}Portal")
     print(f"      + import for {name.capitalize()}Portal (top of file)")
+    print(f"      + ensure search_and_apply() exists on the class (run_portal")
+    print(f"        dispatches every portal through it — no per-portal branch)")
     print(f"  • python scripts/validate_sessions.py --reauth {name}")
     print()
 

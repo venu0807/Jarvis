@@ -5,7 +5,7 @@ Flow:
   2. Tailor resumes for manual/skipped jobs only
   3. Send Email summary (email-only — Telegram removed 2026-06-16)
 
-Scheduled at 8:00 AM IST daily via OpenClaw cron.
+Scheduled at 9:00 AM IST daily via jarvis_scheduler.sh (hour "09" in check_daily).
 Run manually: python run_pipeline.py
 """
 import asyncio

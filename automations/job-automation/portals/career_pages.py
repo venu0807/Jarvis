@@ -431,7 +431,7 @@ class CareerPagePortal(BasePortal):
         # No login needed — aggregator APIs are public
         return True
 
-    async def search_and_apply(self, page, roles, cities, daily_limit, applied_today, dry_run=False):
+    async def search_and_apply(self, page, roles, cities, daily_limit, applied_today, dry_run=False, job_filter=None):
         """Pull fresh jobs from companies.json aggregators, then attempt
         real apply on each. Stores results in output/career_apply_log.jsonl.
         Returns list of ApplicationResult.
@@ -461,24 +461,31 @@ class CareerPagePortal(BasePortal):
                     reason=f"custom ATS — apply via {j.get('url', '')[:60]}",
                 ))
                 continue
+            if job_filter is not None and not await job_filter(j):
+                results.append(ApplicationResult(job=j, status="skipped", reason="LLM fit filter rejected"))
+                continue
 
             # Real aggregator apply (or dry-run)
             apply_record = apply_one_job(j, session_log=log_path, dry_run=dry_run)
-            # Persist job to DB regardless (so portal_performance can see it)
-            try:
-                save_jobs_to_db([j], source="career_pages")
-            except Exception:
-                pass
 
             # Map apply_record.status into ApplicationResult.status.
             # dry_run → "manual" so portal_performance treats these as not-yet-applied.
             mapped_status = "manual" if apply_record["status"] in ("dry_run",) else apply_record["status"]
-            results.append(ApplicationResult(
+            result = ApplicationResult(
                 job=j,
                 status=mapped_status,
                 resume_pdf=apply_record.get("resume_pdf", ""),
                 reason=f"aggregator={apply_record['aggregator']} · {apply_record['reason'][:120]}",
-            ))
+            )
+            results.append(result)
+
+            # Persist job to DB regardless (so portal_performance can see it).
+            # Was save_jobs_to_db([j], source=...) — TypeError: db_logger has no
+            # source kwarg and expects ApplicationResult (r.job), not a bare dict.
+            try:
+                save_jobs_to_db([result])
+            except Exception:
+                pass
 
             # Tiny delay to be polite to aggregator endpoints
             import asyncio, random

@@ -29,9 +29,11 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List
 
 import requests
+
+from .profile import _PROFILE, resolve_resume_path as _resolve_resume_path
 
 
 # ── Public Workday tenant catalog (verified live, returns HTTP 200) ────────────
@@ -138,10 +140,14 @@ def search_all_workday(roles: List[str], cities: List[str], limit: int = 20) -> 
 # ── Stage 2: apply (Playwright form fill) ────────────────────────────────────
 
 def apply_to_job(job: dict, profile: dict, resume_pdf: Optional[str],
-                 headless: bool = True) -> tuple[bool, str]:
+                 headless: bool = True, context=None) -> tuple[bool, str]:
     """Playwright-driven Workday application form fill.
     Returns (success: bool, reason: str).
     Profile dict: {first_name, last_name, email, phone, linkedin}.
+    context: optional pre-launched persistent BrowserContext. When given, a
+    page is opened on it and no new browser is launched (shared-browser mode
+    used by _apply_workday_run). Otherwise a fresh browser is launched for
+    standalone/CLI use.
     """
     try:
         from jarvis_browser import SyncBrowser, safe_close_sync
@@ -154,6 +160,14 @@ def apply_to_job(job: dict, profile: dict, resume_pdf: Optional[str],
     if not apply_url.endswith("/apply"):
         apply_url = apply_url.rstrip("/") + "/apply"
 
+    if context is not None:
+        # Shared-browser mode: reuse the caller's persistent context.
+        page = context.new_page()
+        try:
+            return _run_apply_flow(page, apply_url, profile, resume_pdf)
+        finally:
+            safe_close_sync(page)
+
     with SyncBrowser(headless=headless) as browser_mgr:
         try:
             browser = browser_mgr.launch_persistent(
@@ -165,46 +179,51 @@ def apply_to_job(job: dict, profile: dict, resume_pdf: Optional[str],
 
         page = browser.new_page()
         try:
-            page.goto(apply_url, wait_until="domcontentloaded", timeout=60000)
-            page.wait_for_timeout(3000)
-
-            # Click "Apply" if there's an intermediate page
-            try:
-                apply_btn = page.get_by_role("button", name=re.compile(r"Apply", re.I)).first
-                if apply_btn.is_visible(timeout=5000):
-                    apply_btn.click()
-                    page.wait_for_timeout(3000)
-            except Exception:
-                pass
-
-            # Stage 1: account creation
-            handled_account = _try_fill_account(page, profile)
-            if handled_account == "captcha":
-                return False, "captcha encountered — manual apply required"
-
-            # Stage 2: resume upload
-            if resume_pdf and Path(resume_pdf).exists():
-                uploaded = _try_upload_resume(page, resume_pdf)
-                if not uploaded:
-                    print(f"  ⚠ resume upload failed — continuing (Workday allows skip + paste)")
-
-            # Stage 3: my information (contact info)
-            _try_fill_my_info(page, profile)
-
-            # Stage 4: my experience
-            _try_fill_experience(page, profile)
-
-            # Stage 5: voluntary disclosures + EEO
-            _try_skip_voluntary(page)
-
-            # Stage 6: review then submit
-            submitted = _try_submit(page)
-            return submitted, "submitted" if submitted else "submit button not found"
-        except Exception as e:
-            return False, f"exception in apply flow: {type(e).__name__}: {str(e)[:120]}"
+            return _run_apply_flow(page, apply_url, profile, resume_pdf)
         finally:
             safe_close_sync(page)
-            safe_close_sync(browser)
+
+
+def _run_apply_flow(page, apply_url: str, profile: dict, resume_pdf: Optional[str]) -> tuple[bool, str]:
+    """The 6-stage Workday form-fill on an already-open page."""
+    try:
+        page.goto(apply_url, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(3000)
+
+        # Click "Apply" if there's an intermediate page
+        try:
+            apply_btn = page.get_by_role("button", name=re.compile(r"Apply", re.I)).first
+            if apply_btn.is_visible(timeout=5000):
+                apply_btn.click()
+                page.wait_for_timeout(3000)
+        except Exception:
+            pass
+
+        # Stage 1: account creation
+        handled_account = _try_fill_account(page, profile)
+        if handled_account == "captcha":
+            return False, "captcha encountered — manual apply required"
+
+        # Stage 2: resume upload
+        if resume_pdf and Path(resume_pdf).exists():
+            uploaded = _try_upload_resume(page, resume_pdf)
+            if not uploaded:
+                print(f"  ⚠ resume upload failed — continuing (Workday allows skip + paste)")
+
+        # Stage 3: my information (contact info)
+        _try_fill_my_info(page, profile)
+
+        # Stage 4: my experience
+        _try_fill_experience(page, profile)
+
+        # Stage 5: voluntary disclosures + EEO
+        _try_skip_voluntary(page)
+
+        # Stage 6: review then submit
+        submitted = _try_submit(page)
+        return submitted, "submitted" if submitted else "submit button not found"
+    except Exception as e:
+        return False, f"exception in apply flow: {type(e).__name__}: {str(e)[:120]}"
 
 
 # ── Form-fill helpers (best-effort — Workday UIs differ per tenant) ─────────
@@ -332,22 +351,6 @@ def _role_match(title: str, patterns: list) -> bool:
     return any(p in t for p in patterns)
 
 
-def _resolve_resume_path() -> Optional[str]:
-    """Same logic as career_pages_apply._resolve_resume_path."""
-    explicit = os.environ.get("RESUME_PDF_PATH")
-    if explicit and Path(explicit).exists():
-        return explicit
-    default = Path(os.path.expanduser("~")) / "V" / "VenuGopalReddy-Palugulla-AI-Resume.pdf"
-    if default.exists():
-        return str(default)
-    out_dir = Path("D:/Proposals/Jarvis/automations/job-automation/output/resumes")
-    if out_dir.exists():
-        pdfs = sorted(out_dir.glob("*.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)
-        if pdfs:
-            return str(pdfs[0])
-    return None
-
-
 # ── CLI smoke runner ──────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -385,7 +388,12 @@ class WorkdayPortal:
         return True
 
     async def search_and_apply(self, page, roles, cities, daily_limit, applied_today, **kwargs):
-        """Sync search wrapped in async — Playwright apply happens here too."""
+        """Public search + Playwright apply, capped to daily_limit per company.
+
+        One shared persistent browser context for the whole run instead of one
+        full Chromium launch per job (was ~1-3s + ~150MB per job). Workday
+        apply is an unauthenticated public form, so a single profile is fine.
+        """
         import asyncio
         from .base import ApplicationResult
         loop = asyncio.get_running_loop()
@@ -397,51 +405,45 @@ class WorkdayPortal:
         # Tag portal for dashboard
         for j in jobs:
             j["portal"] = "Workday"
-        # Apply each (Playwright form fill) — capped to daily_limit per company
-        per_company = {}
-        results = []
-        profile = _load_profile_dict()
-        resume_pdf = _resolve_resume_path()
+        # Optional LLM fit filter — must run here (async), not inside the sync
+        # executor below.
+        job_filter = kwargs.get("job_filter")
+        if job_filter is not None:
+            jobs = [j for j in jobs if await job_filter(j)]
+        # Apply each — one browser launch, one thread (SyncBrowser is not
+        # thread-safe, so the whole apply loop runs inside a single executor call).
+        # Honor HEADLESS env (default headless for cron; set false to watch it).
+        headless = os.getenv("HEADLESS", "true").lower() == "true"
+        results = await loop.run_in_executor(
+            None,
+            lambda: _apply_workday_run(jobs, _PROFILE, _resolve_resume_path(), daily_limit, headless)
+        )
+        return results
+
+
+def _apply_workday_run(jobs: list, profile: dict, resume_pdf: Optional[str],
+                       daily_limit: int, headless: bool = True) -> list:
+    """Apply to every job with one shared persistent browser session."""
+    from .base import ApplicationResult
+    from jarvis_browser import SyncBrowser
+
+    per_company: dict = {}
+    results: list = []
+    with SyncBrowser(headless=headless) as browser_mgr:
+        ctx = browser_mgr.launch_persistent(
+            user_data_dir=str(Path.home() / ".jarvis" / "wd_browser"),
+            extra_kwargs={"viewport": {"width": 1280, "height": 900}},
+        )
         for j in jobs:
             tenant = j.get("_tenant", "?")
             per_company.setdefault(tenant, 0)
             if per_company[tenant] >= daily_limit:
                 continue
-            success, msg = await loop.run_in_executor(
-                None,
-                lambda j=j: apply_to_job(j, profile, resume_pdf, headless=True)
-            )
+            success, msg = apply_to_job(j, profile, resume_pdf, context=ctx)
             per_company[tenant] += 1
-            status = "applied" if success else "manual"
             results.append(ApplicationResult(
                 job=j,
-                status=status,
+                status="applied" if success else "manual",
                 reason=msg,
             ))
-        return results
-
-
-def _load_profile_dict() -> dict:
-    """Read same fields as career_pages_apply._load_profile."""
-    from pathlib import Path
-    env_path = Path(__file__).parent.parent / ".env"
-    out = {"first_name": "", "last_name": "", "email": "", "phone": "", "linkedin": ""}
-    if not env_path.exists():
-        return out
-    for raw in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, _, v = line.partition("=")
-        v = v.strip().strip('"').strip("'")
-        if k == "USER_FULL_NAME":
-            parts = v.split(maxsplit=1)
-            out["first_name"] = parts[0] if parts else ""
-            out["last_name"] = parts[1] if len(parts) > 1 else ""
-        elif k == "GMAIL_ADDRESS":
-            out["email"] = v
-        elif k == "USER_PHONE":
-            out["phone"] = v
-        elif k == "USER_LINKEDIN_URL":
-            out["linkedin"] = v
-    return out
+    return results

@@ -76,7 +76,7 @@ class FreshersworldPortal(BasePortal):
             return False
 
     async def search_and_apply(self, page: Page, roles: list, cities: list,
-                               daily_limit: int, applied_today: set) -> list:
+                               daily_limit: int, applied_today: set, job_filter=None) -> list:
         results = []
         applied = 0
 
@@ -163,6 +163,12 @@ class FreshersworldPortal(BasePortal):
 
                             if is_experienced_role(title, ""):
                                 print(f"     ⏭️  Skipped (experience): {title}")
+                                continue
+                            if job_filter is not None and not await job_filter({
+                                "id": job_id, "title": title, "company": company,
+                                "url": job_url, "portal": "Freshersworld"
+                            }):
+                                print(f"     ⏭️  Skipped: LLM fit filter rejected")
                                 continue
 
                             # Apply directly via link

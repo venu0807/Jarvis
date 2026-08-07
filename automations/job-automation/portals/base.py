@@ -11,6 +11,12 @@ EMAIL     = os.getenv("GMAIL_ADDRESS", "user@example.com")
 PHONE_RAW = os.getenv("USER_PHONE", "+910000000000")
 PHONE_DIGITS = PHONE_RAW.replace("+91", "").replace("+", "").strip()
 
+# Derive first/last name from USER_FULL_NAME ("First Last") instead of
+# hardcoding. USER_LAST_NAME overrides when the full name is ambiguous.
+_NAME_PARTS = NAME.split(maxsplit=1)
+FIRST_NAME  = _NAME_PARTS[0] if _NAME_PARTS else ""
+LAST_NAME   = os.getenv("USER_LAST_NAME", "") or (_NAME_PARTS[1] if len(_NAME_PARTS) > 1 else "")
+
 
 @dataclass
 class ApplicationResult:
@@ -100,10 +106,7 @@ class BasePortal:
                 el = page.locator(fn_sel).first
                 if await el.is_visible(timeout=400):
                     if not await el.input_value():
-                        if NAME and NAME != "User Name":
-                            await el.fill(NAME)
-                        else:
-                            await el.fill("User Name")
+                        await el.fill(FIRST_NAME)
                     break
             except:
                 continue
@@ -112,7 +115,7 @@ class BasePortal:
                 el = page.locator(ln_sel).first
                 if await el.is_visible(timeout=400):
                     if not await el.input_value():
-                        await el.fill("Palugulla")
+                        await el.fill(LAST_NAME)
                     break
             except:
                 continue

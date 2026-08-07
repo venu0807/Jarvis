@@ -2,5 +2,4 @@ playwright
 python-dotenv
 requests
 beautifulsoup4
-pdfplumber
-reportlab
+psycopg2

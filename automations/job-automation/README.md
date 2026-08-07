@@ -94,5 +94,5 @@ If you want to run specific parts of the project:
 - Execution logs, compiled LaTeX `.tex` and `.pdf` tailored resumes will all be stored safely in the `output/` directory (auto-cleaned after 7 days).
 
 ## 🕒️ Cron Setup
-- **Recommended cron schedule:** `0 8 * * *` (daily at 8am)
+- **Scheduled at:** 9:00 AM IST via `jarvis_scheduler.sh` (hour `09`). Standalone cron: `0 9 * * *`.
 - **Custom cron:** edit `run_pipeline.py` to suit your needs
