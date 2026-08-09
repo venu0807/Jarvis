@@ -1,12 +1,15 @@
 import csv
+import os
+
 import psycopg2
+
 
 def migrate():
     # Connect to PostgreSQL
     conn = psycopg2.connect(
         dbname="pinterest_db",
-        user="venu",
-        password="venu",
+        user=os.environ.get("PINTEREST_DB_USER", "venu"),
+        password=os.environ.get("PINTEREST_DB_PASSWORD"),
         host="127.0.0.1"
     )
     cur = conn.cursor()
