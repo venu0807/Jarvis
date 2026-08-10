@@ -15,6 +15,7 @@ import logging
 import os
 import subprocess
 import sys
+import traceback
 from pathlib import Path
 
 # Configure UTF-8 encoding for standard output and error to avoid UnicodeEncodeError on Windows
@@ -228,8 +229,13 @@ def main():
         # Import and run async main directly (avoids subprocess overhead)
         import auto_applier
         summary = asyncio.run(auto_applier.main())
+        if not summary:  # lock held by another run — don't clobber
+            print("⛔ Pipeline skipped (lock held or no summary produced). Nothing to do.")
+            return
     except Exception as e:
         print(f"⚠️  Auto-apply had errors: {e}")
+        log.error("Auto-apply FAILED: %s", e)
+        log.error(traceback.format_exc())
         # Load the saved summary
         if LOG_FILE.exists():
             with open(LOG_FILE, encoding="utf-8") as f:

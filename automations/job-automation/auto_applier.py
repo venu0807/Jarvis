@@ -10,6 +10,7 @@ import datetime
 import json
 import os
 import sys
+import traceback
 from pathlib import Path
 
 # Configure UTF-8 encoding for standard output and error to avoid UnicodeEncodeError on Windows
@@ -229,7 +230,32 @@ def build_summary(all_results: list) -> dict:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def _acquire_run_lock() -> bool:
+    """Prevent overlapping pipeline runs. Stale-lock tolerant: if the PID
+    in the lockfile is no longer alive, the lock is considered free."""
+    lock_path = Path(__file__).parent / "output" / ".pipeline.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if lock_path.exists():
+            prior_pid = lock_path.read_text().strip()
+            if prior_pid.isdigit() and prior_pid != str(os.getpid()):
+                # PID alive?
+                try:
+                    os.kill(int(prior_pid), 0)
+                    print(f"⛔ Another pipeline run is active (pid {prior_pid}). Exiting to avoid clobbering today's summary.")
+                    return False
+                except (ProcessLookupError, PermissionError, ValueError):
+                    pass  # stale lock from a dead process — take it over
+        lock_path.write_text(str(os.getpid()))
+        return True
+    except Exception as e:
+        print(f"⚠️  Lock check failed ({e}) — proceeding without lock")
+        return True
+
+
 async def main():
+    if not _acquire_run_lock():
+        return
     parser = argparse.ArgumentParser(description="OpenClaw Auto-Apply Engine")
     parser.add_argument("--portal",   help="Run one portal only: naukri|internshala|indeed|foundit|cutshort|freshersworld|wellfound|career_pages|workday")
     parser.add_argument("--headful",  action="store_true", help="Run with a visible browser (overrides HEADLESS=.env)")
@@ -285,6 +311,7 @@ async def main():
                 await browser_mgr.save_session(context, session_file)
             except Exception as e:
                 print(f"\n❌ {name} portal crashed: {e}")
+                traceback.print_exc()
             finally:
                 await safe_close_async(context)
 
@@ -297,6 +324,23 @@ async def main():
     # Build and save summary
     summary  = build_summary(all_results)
     log_path = LOG_DIR / f"applications_{today}.json"
+
+    # Don't overwrite a non-empty same-day summary with an all-empty one.
+    # A crashed/early-exit run produces zeros and would otherwise wipe
+    # results already recorded by an earlier, successful run today.
+    new_total = summary["totals"].get("applied", 0) + summary["totals"].get("manual", 0)
+    try:
+        if not new_total and log_path.exists():
+            existing = json.loads(log_path.read_text(encoding="utf-8"))
+            old_total = (existing.get("totals", {}).get("applied", 0)
+                         + existing.get("totals", {}).get("manual", 0))
+            if old_total:
+                print(f"\n⚠️  This run found 0 jobs but applications_{today}.json already has "
+                      f"{old_total} results — KEEPING existing summary instead of overwriting.")
+                return summary
+    except (json.JSONDecodeError, OSError):
+        pass
+
     log_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\n📊 Summary saved → {log_path}")
 

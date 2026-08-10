@@ -4,6 +4,7 @@ https://cutshort.io — Developer-focused job portal, clean UI, skills-based mat
 """
 import os
 import random
+import hashlib
 from playwright.async_api import Page
 from .base import BasePortal, ApplicationResult, is_experienced_role
 
@@ -137,7 +138,7 @@ class CutshortPortal(BasePortal):
                                 href = self.base_url + href
                             job_url = href or ""
 
-                            job_id = f"cutshort_{abs(hash(job_url)) % 999999}"
+                            job_id = f"cutshort_{hashlib.sha256(job_url.encode()).hexdigest()[:10]}"
 
                             if job_id in applied_today:
                                 print(f"     ⏭️  Already applied: {title}")

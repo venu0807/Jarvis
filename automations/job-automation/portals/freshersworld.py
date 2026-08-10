@@ -4,6 +4,7 @@ https://www.freshersworld.com — Fresher-focused portal, very simple HTML, high
 """
 import os
 import random
+import hashlib
 from playwright.async_api import Page
 from .base import BasePortal, ApplicationResult, is_experienced_role
 
@@ -156,7 +157,7 @@ class FreshersworldPortal(BasePortal):
                                 href = self.base_url + href
                             job_url = href or ""
 
-                            job_id = f"freshersworld_{abs(hash(job_url)) % 999999}"
+                            job_id = f"freshersworld_{hashlib.sha256(job_url.encode()).hexdigest()[:10]}"
 
                             if job_id in applied_today:
                                 continue

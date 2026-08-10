@@ -8,6 +8,7 @@ portals/naukri.py — Naukri Quick Apply with persistent session support
 import random
 import asyncio
 import datetime
+import hashlib
 from playwright.async_api import Page
 from .base import BasePortal, ApplicationResult, is_experienced_role
 
@@ -119,10 +120,14 @@ class NaukriPortal(BasePortal):
         results = []
         applied = 0
         today = datetime.date.today().isoformat()
+        limit_hit = False
 
-        for role in roles[:4]:
-            for city in cities[:3]:
+        for role in roles:
+            if limit_hit:
+                break
+            for city in cities:
                 if applied >= daily_limit:
+                    limit_hit = True
                     break
                 try:
                     # Check if page is still alive; recreate if dead
@@ -140,7 +145,7 @@ class NaukriPortal(BasePortal):
                     loc   = city.replace(" ", "-").lower()
                     url   = (
                         f"https://www.naukri.com/{role.replace(' ','-').lower()}"
-                        f"-jobs-in-{loc}?experience=0&jobAge=1"
+                        f"-jobs-in-{loc}?experience=0&jobAge=7"
                     )
                     await page.goto(url, wait_until="domcontentloaded", timeout=TIMEOUT)
                     await page.wait_for_timeout(3000)
@@ -177,7 +182,7 @@ class NaukriPortal(BasePortal):
                         if not href or not title:
                             continue
 
-                        job_id = f"naukri_{abs(hash(href)) % 9999999}"
+                        job_id = f"naukri_{hashlib.sha256(href.encode()).hexdigest()[:10]}"
                         if job_id in applied_today:
                             print(f"     ⏭️  Already applied: {title}")
                             continue

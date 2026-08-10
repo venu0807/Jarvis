@@ -4,6 +4,7 @@ https://wellfound.com — Startup-focused, great for AI/ML Python roles, one-cli
 """
 import os
 import random
+import hashlib
 from playwright.async_api import Page
 from .base import BasePortal, ApplicationResult, is_experienced_role
 
@@ -148,7 +149,7 @@ class WellfoundPortal(BasePortal):
                                 href = self.base_url + href
                             job_url = href or ""
 
-                            job_id = f"wellfound_{abs(hash(job_url)) % 999999}"
+                            job_id = f"wellfound_{hashlib.sha256(job_url.encode()).hexdigest()[:10]}"
 
                             if job_id in applied_today:
                                 continue
