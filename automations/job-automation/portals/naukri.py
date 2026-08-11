@@ -9,8 +9,18 @@ import random
 import asyncio
 import datetime
 import hashlib
+from typing import Optional
 from playwright.async_api import Page
-from .base import BasePortal, ApplicationResult, is_experienced_role
+from .base import (
+    BasePortal,
+    ApplicationResult,
+    is_experienced_role,
+    NAME,
+    FIRST_NAME,
+    LAST_NAME,
+    EMAIL,
+    PHONE_DIGITS,
+)
 
 TIMEOUT = 60_000
 
@@ -267,8 +277,33 @@ class NaukriPortal(BasePortal):
         except:
             return ""
 
-    def _resolve_chatbot_answer(self, question: str) -> str:
-        q = question.lower()
+    def _resolve_chatbot_answer(self, question: str) -> Optional[str]:
+        """Resolve a free-text chatbot question to a typed answer.
+
+        Returns None when the question can't be confidently answered. The
+        caller must NOT type anything then — it marks the job manual. Never
+        default unknown questions to a canned "Yes": the old fallback typed
+        "Yes" into name/email/phone fields and submitted invalid applications.
+        """
+        q = (question or "").strip().lower()
+        if not q:
+            return None
+
+        # ── Identity / contact — NEVER free-text a canned reply here ──────────
+        if any(k in q for k in ["full name", "your name", "what is your name",
+                                "enter your name", "candidate name"]):
+            return NAME
+        if "first name" in q:
+            return FIRST_NAME
+        if "last name" in q:
+            return LAST_NAME
+        if "email" in q or "mail id" in q or "email address" in q:
+            return EMAIL
+        if "phone" in q or "mobile" in q or "contact number" in q or "phone number" in q:
+            return PHONE_DIGITS
+        if "current location" in q or "current city" in q or "currently located" in q or "current address" in q:
+            return "Delhi"
+
         if "gender" in q or "sex" in q:
             return "Male"
         elif "dob" in q or "date of birth" in q or "birth date" in q or "birthday" in q:
@@ -288,6 +323,10 @@ class NaukriPortal(BasePortal):
                 return "85"
             return "8.35"
         elif "experience" in q or "exp " in q or ("years of" in q and "passing" not in q) or ("year of" in q and "passing" not in q) or "how many year" in q:
+            # Yes/no skill question ("do you have experience with X") — answer
+            # from the resume. A years-count question gets the fresher answer.
+            if ("do you have" in q or "have you" in q) and self._has_resume_skill(q):
+                return "Yes"
             return "0"
         elif q.strip() == "age" or "your age" in q or "what is your age" in q or ("age" in q and "experience" not in q and "agent" not in q and "package" not in q):
             return "24"
@@ -303,8 +342,6 @@ class NaukriPortal(BasePortal):
             if "immediate" in q or "days" in q or "month" in q:
                 return "Immediate"
             return "15 days"
-        elif "location" in q or "city" in q or "current city" in q or "live" in q:
-            return "Delhi"
         elif "degree" in q or "qualification" in q or "education" in q or "college" in q or "university" in q:
             return "MCA"
         elif "skill" in q or "proficien" in q or "familiar" in q or "knowledge" in q or "know" in q:
@@ -322,9 +359,16 @@ class NaukriPortal(BasePortal):
                                     "previous employer", "previous company", "last company",
                                     "employed currently", "presently working"]):
             return "No"
-        elif "are you" in q or "do you" in q or "have you" in q or "willing" in q:
+        # Genuine yes/no intent. Excludes "why do you"/"what do you"/"how do you"
+        # leads — those are open questions and must not get a canned "Yes".
+        elif ("are you" in q or "would you" in q or "can you" in q
+              or "willing" in q or "agree" in q or "accept" in q
+              or "interested in" in q or "ready to" in q
+              or "open to" in q or "ok for you" in q):
             return "Yes"
-        return "Yes"
+        # Unhandled/free-text question (why this role, describe a project, …).
+        # No confident answer — caller marks the job manual instead of typing "Yes".
+        return None
 
     # Skills from resume — used for accurate skill-based answers
     RESUME_SKILLS = [
@@ -578,8 +622,6 @@ class NaukriPortal(BasePortal):
                 await page.wait_for_timeout(2500)
 
             # Early success check — some jobs apply directly without a form
-
-            # Early success check — some jobs apply directly without a form
             try:
                 _ = page.url
             except:
@@ -620,6 +662,12 @@ class NaukriPortal(BasePortal):
                     # Page redirected away from job listing after clicking Apply
                     if await self._is_applied(page):
                         print(f"     ✅ Naukri Applied: {job['title']} @ {job['company']}")
+                        return ApplicationResult(job=job, status="applied")
+                    # /myapply/saveApply?strJobsarr=[…] is Naukri's standard
+                    # Quick-Apply POST redirect: profile-based submission went
+                    # through with no questionnaire form to fill.
+                    if "saveApply" in current_url:
+                        print(f"     ✅ Naukri Applied (saveApply redirect): {job['title']} @ {job['company']}")
                         return ApplicationResult(job=job, status="applied")
                     # Redirected but no success message — was likely already applied or external
                     print(f"     ⏭️  Redirected after apply: {current_url[:60]}")
@@ -751,7 +799,17 @@ class NaukriPortal(BasePortal):
                             answer = self._resolve_chatbot_answer(drawer_question or "")
                             print(f"     🤖 Chatbot input found ({has_input.get('type')}: {has_input.get('tag')}, placeholder='{has_input.get('placeholder', '')}')")
                             print(f"       Q: '{drawer_question}' -> A: '{answer}'")
-                            
+
+                            # Fail-safe: never type a canned guess into an
+                            # unhandled question — the job goes to the manual
+                            # queue where a human applies with a tailored resume.
+                            if answer is None:
+                                print(f"     ⚠️  Cannot confidently answer '{drawer_question}' — marking manual")
+                                return ApplicationResult(
+                                    job=job, status="manual",
+                                    reason=f"Cannot answer chatbot question: {(drawer_question or '')[:60]}"
+                                )
+
                             if has_input.get("type") == "contenteditable":
                                 # Click the contenteditable, clear it, type the answer
                                 ce = container.locator("[contenteditable='true'], [contenteditable]").first

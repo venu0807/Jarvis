@@ -141,11 +141,25 @@ def cleanup_old_files():
             log.info("Archived %d stale session files (>30 days)", purged)
 
 
+def _is_expected_skip(reason: str) -> bool:
+    """A manual/skipped job isn't a failure signal when the bot correctly
+    declined to apply — external redirect to the company site, or the job was
+    already applied previously. Only genuinely-stuck jobs (couldn't complete
+    the form, no apply button, errors) indicate a portal UI/DOM change."""
+    r = (reason or "").lower()
+    return any(k in r for k in [
+        "external",          # External company site apply — skipped
+        "already applied",   # Already applied
+        "redirected after",  # Redirected after apply
+    ])
+
+
 def check_failure_rates(days_back: int = 7, threshold: float = 0.5) -> list:
     """
     Scans the last N days of application logs and flags any portal whose
-    manual/error rate exceeds the threshold (e.g. 50% = likely UI change).
-    Returns a list of alert dicts.
+    genuinely-stuck rate (unresolved manual jobs + errors, excluding expected
+    skips like external redirects / already-applied) exceeds the threshold
+    (e.g. 50% = likely UI change). Returns a list of alert dicts.
     """
     import datetime
     alerts = []
@@ -165,33 +179,31 @@ def check_failure_rates(days_back: int = 7, threshold: float = 0.5) -> list:
         except (json.JSONDecodeError, OSError):
             continue
 
-        # Build per-portal stats from applied + manual lists
-        all_entries = []
-        for item in data.get("applied", []):
-            all_entries.append((item.get("portal", "unknown"), "applied"))
-        for item in data.get("manual", []):
-            all_entries.append((item.get("portal", "unknown"), "manual"))
-
+        # applied = fine; manual counts only when the reason is NOT an
+        # expected skip (external redirect / already-applied).
         per_portal = {}
-        for portal_name, status in all_entries:
-            if portal_name not in per_portal:
-                per_portal[portal_name] = {"total": 0, "manual": 0}
-            per_portal[portal_name]["total"] += 1
-            if status == "manual":
-                per_portal[portal_name]["manual"] += 1
+        for item in data.get("applied", []):
+            p = item.get("portal", "unknown")
+            per_portal.setdefault(p, {"total": 0, "stuck": 0})["total"] += 1
+        for item in data.get("manual", []):
+            p = item.get("portal", "unknown")
+            stats = per_portal.setdefault(p, {"total": 0, "stuck": 0})
+            stats["total"] += 1
+            if not _is_expected_skip(item.get("reason", "")):
+                stats["stuck"] += 1
 
         for portal_name, stats in per_portal.items():
             if stats["total"] == 0:
                 continue
-            manual_ratio = stats["manual"] / stats["total"]
-            if manual_ratio >= threshold:
+            stuck_ratio = stats["stuck"] / stats["total"]
+            if stuck_ratio >= threshold:
                 alerts.append({
                     "portal": portal_name,
                     "date": date_str,
                     "total": stats["total"],
-                    "manual": stats["manual"],
-                    "ratio": round(manual_ratio, 2),
-                    "message": f"{portal_name}: {stats['manual']}/{stats['total']} jobs manual ({manual_ratio:.0%}) — possible UI/DOM change",
+                    "stuck": stats["stuck"],
+                    "ratio": round(stuck_ratio, 2),
+                    "message": f"{portal_name}: {stats['stuck']}/{stats['total']} jobs unresolved ({stuck_ratio:.0%}) — possible UI/DOM change",
                 })
 
     return alerts
