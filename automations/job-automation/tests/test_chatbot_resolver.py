@@ -48,6 +48,16 @@ def test_experience_count_vs_yes_no():
     assert p._resolve_chatbot_answer("Do you have experience with Python?") == "Yes"
 
 
+def test_count_question_with_skill_name_is_not_yes():
+    # "How many years … in Data Structures?" names a resume skill, but it
+    # asks for a COUNT, not yes/no. Must answer "0", not "Yes".
+    p = make()
+    assert p._resolve_chatbot_answer(
+        "How many years of experience do you have in Data Structures?") == "0"
+    assert p._resolve_chatbot_answer(
+        "How many years of experience do you have in Algorithms?") == "0"
+
+
 def test_fresher_basics_still_work():
     p = make()
     assert p._resolve_chatbot_answer("How many years of experience you have?") == "0"

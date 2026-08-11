@@ -323,8 +323,15 @@ class NaukriPortal(BasePortal):
                 return "85"
             return "8.35"
         elif "experience" in q or "exp " in q or ("years of" in q and "passing" not in q) or ("year of" in q and "passing" not in q) or "how many year" in q:
+            # Count question ("how many years of experience in X?") — fresher
+            # answer is 0, even when the question names a resume skill. The
+            # skill yes/no shortcut below must NOT fire on count questions,
+            # else "How many years … in Data Structures?" types "Yes" and
+            # Naukri rejects with "Try again".
+            if "how many" in q:
+                return "0"
             # Yes/no skill question ("do you have experience with X") — answer
-            # from the resume. A years-count question gets the fresher answer.
+            # from the resume.
             if ("do you have" in q or "have you" in q) and self._has_resume_skill(q):
                 return "Yes"
             return "0"
