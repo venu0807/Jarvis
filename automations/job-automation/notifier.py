@@ -79,6 +79,20 @@ def build_html(summary: dict) -> str:
     if not manual_rows:
         manual_rows = "<tr><td colspan='6' style='padding:8px;color:#888;font-style:italic'>None</td></tr>"
 
+    # Re-login required banner — stale session means a portal applied 0 jobs
+    relogin = summary.get("needs_relogin", []) or []
+    relogin_banner = ""
+    if relogin:
+        ports = ", ".join(relogin)
+        relogin_banner = f"""
+<div style='background:#fce4ec;border:1px solid #e57373;border-radius:8px;padding:14px 18px;margin:16px 0;'>
+  <b style='color:#c62828'>⚠️ Log back in to: {ports}</b>
+  <div style='color:#7c2d2d;font-size:13px;margin-top:4px'>
+    These portals' saved sessions expired, so they were skipped (0 applies).
+    Open each once in a normal browser and log in, then tomorrow's run will pick them up.
+  </div>
+</div>"""
+
     return f"""<html>
 <body style='font-family:Arial,sans-serif;max-width:750px;margin:auto;padding:20px;color:#222'>
 
@@ -141,6 +155,8 @@ def build_html(summary: dict) -> str:
   </tr>
   {manual_rows}
 </table>
+
+{relogin_banner}
 
 <p style='color:#aaa;font-size:11px;margin-top:28px'>
   🦞 OpenClaw + Ollama {os.getenv("OLLAMA_MODEL","phi4-mini")} — 100% local, zero data leakage · Email-only notifications

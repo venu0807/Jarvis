@@ -254,6 +254,7 @@ def main():
                 summary = json.load(f)
         else:
             summary = {"date": TODAY, "applied": [], "manual": [], "portal_counts": {},
+                       "needs_relogin": [],
                        "totals": {"applied": 0, "manual_total": 0, "errors": 0},
                        "_manual_jobs": [], "_skipped_jobs": []}
 

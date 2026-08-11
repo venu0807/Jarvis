@@ -41,7 +41,7 @@ from db_logger import save_jobs_to_db
 load_dotenv(Path(__file__).parent / ".env")
 
 # ── Config ────────────────────────────────────────────────────────────────────
-DAILY_LIMIT = int(os.getenv("DAILY_LIMIT", "15"))   # max applies per portal
+DAILY_LIMIT = int(os.getenv("DAILY_LIMIT", "20"))   # max applies per portal
 HEADLESS    = os.getenv("HEADLESS", "false").lower() == "true"
 
 ROLES = [
@@ -100,13 +100,19 @@ def save_applied(new_ids: set):
 
 # ── Portal runner ─────────────────────────────────────────────────────────────
 
-async def run_portal(portal_name: str, portal_cls, context) -> list:
+async def run_portal(portal_name: str, portal_cls, context) -> tuple[list, bool]:
+    """Run one portal. Returns (results, session_ok).
+
+    session_ok=False means the saved auth session was rejected/expired and
+    the portal is skipped (0 applies). The caller surfaces this so a stale
+    session gets a one-time manual re-login instead of silently returning 0.
+    """
     cred = CREDS[portal_name]
     # Skip credential check for portals that don't need auth (Workday, CareerPages)
     if portal_name not in ("workday", "career_pages"):
         if not cred["email"] or not cred["password"]:
             print(f"\n⚠️  {portal_name}: credentials not set in .env — skipping")
-            return []
+            return [], False
 
     portal  = portal_cls(email=cred["email"], password=cred["password"])
     page    = await context.new_page()
@@ -117,7 +123,8 @@ async def run_portal(portal_name: str, portal_cls, context) -> list:
         # ── Login (uses saved session if valid) ───────────────────────────────────
         logged_in = await portal.login(page)
         if not logged_in:
-            return []
+            print(f"  ⚠️  {portal_name}: session rejected — needs a one-time manual re-login")
+            return [], False
 
         # ── Live search + apply ───────────────────────────────────────────────────
         # All 9 portals implement search_and_apply(page, roles, cities,
@@ -143,7 +150,7 @@ async def run_portal(portal_name: str, portal_cls, context) -> list:
                 page, ROLES, CITIES, DAILY_LIMIT, applied_today, job_filter=job_filter
             )
         save_applied({r.job["id"] for r in results if r.status == "applied"})
-        return results
+        return results, True
 
     finally:
         try:
@@ -155,7 +162,7 @@ async def run_portal(portal_name: str, portal_cls, context) -> list:
 
 # ── Summary builder ───────────────────────────────────────────────────────────
 
-def build_summary(all_results: list) -> dict:
+def build_summary(all_results: list, needs_relogin: list | None = None) -> dict:
     applied  = [r for r in all_results if r.status == "applied"]
     manual   = [r for r in all_results if r.status == "manual"]
     skipped  = [r for r in all_results if r.status == "skipped"]
@@ -209,6 +216,7 @@ def build_summary(all_results: list) -> dict:
         "portal_counts": portal_counts,
         "applied":       applied_list,
         "manual":        manual_list,
+        "needs_relogin": needs_relogin or [],
         "totals": {
             "applied":             len(applied),
             "manual":              len(manual),
@@ -297,6 +305,7 @@ async def main():
         portal_map = {args.portal: portal_map[args.portal]}
 
     all_results: list = []
+    needs_relogin: list = []
 
     async with AsyncBrowser(headless=is_headless) as browser_mgr:
         for name, cls in portal_map.items():
@@ -306,8 +315,11 @@ async def main():
             context = await browser_mgr.new_context_with_session(session_file)
 
             try:
-                results = await run_portal(name, cls, context)
+                results, session_ok = await run_portal(name, cls, context)
                 all_results.extend(results)
+                # Auth-less aggregator portals don't need re-login
+                if not session_ok and name not in ("workday", "career_pages"):
+                    needs_relogin.append(name)
                 await browser_mgr.save_session(context, session_file)
             except Exception as e:
                 print(f"\n❌ {name} portal crashed: {e}")
@@ -322,7 +334,7 @@ async def main():
         print(f"\n⚠️  Could not save to local database: {dbe}")
 
     # Build and save summary
-    summary  = build_summary(all_results)
+    summary  = build_summary(all_results, needs_relogin)
     log_path = LOG_DIR / f"applications_{today}.json"
 
     # Don't overwrite a non-empty same-day summary with an all-empty one.
