@@ -16,6 +16,7 @@ import datetime
 import subprocess
 import threading
 import logging
+from pathlib import Path
 from event_bus import get_bus
 
 # Configure unified logging
@@ -85,34 +86,29 @@ def handle_job_event(event_type, payload):
     if company:
         logger.info(f"🤝 BRIDGE: Job applied! Triggering LinkedIn Outreach to Hiring Manager at '{company}'...")
         try:
-            # Trigger the linkedin bot targeted at this specific company
-            cmd = f"cd automations/linkedin-outreach && python main.py --target-company '{company}'"
-            subprocess.Popen(["bash", "-c", cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Trigger the linkedin bot targeted at this specific company.
+            # argv list + explicit cwd: never pass untrusted payload through a shell.
+            linkedin_dir = Path(__file__).resolve().parent / "automations" / "linkedin-outreach"
+            subprocess.Popen(
+                [sys.executable, str(linkedin_dir / "main.py"), "--target-company", company],
+                cwd=str(linkedin_dir),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
         except Exception as e:
             logger.error(f"Failed to trigger LinkedIn Bridge: {e}")
 
 def start_event_bus():
-    """Initializes and subscribes to event bus channels."""
+    """Initializes the event bus."""
     ensure_redis()
-    bus = get_bus()
-    if not bus.client:
-        logger.error("Could not connect to Redis. Ensure Redis is running.")
-        return
-    
-    bus.subscribe("pinterest.*", handle_pinterest_event)
-    bus.subscribe("jobs.*", handle_job_event)
-    
-    thread = bus.listen_in_thread()
-    if thread:
-        logger.info("🎧 Event Bus listener thread started.")
-    return bus
+    get_bus()
 
 def run_pinterest_scraper():
     """Triggers the Pinterest scraper (runs daily at 2 AM)"""
     logger.info("🚀 Triggering Pinterest Autonomous Scraper...")
     try:
         # Assuming venv is set up correctly in the environment
-        cmd = "cd automations/pinterest && python -c 'from amazon_scraper import scrape_amazon; scrape_amazon()'"
+        cmd = "cd automations/pinterest && /home/venu/Proposals/Jarvis/automations/pinterest/venv/bin/python -c 'from amazon_scraper import scrape_amazon; scrape_amazon()'"
         subprocess.run(["bash", "-c", cmd], check=False)
     except Exception as e:
         logger.error(f"Scraper failed: {e}")
@@ -121,7 +117,7 @@ def run_pinterest_poster():
     """Triggers the Pinterest poster (runs at 8, 12, 18, 22)"""
     logger.info("📌 Triggering Pinterest Autonomous Poster...")
     try:
-        cmd = "cd automations/pinterest && xvfb-run -a python main.py run --count 15"
+        cmd = "cd automations/pinterest && xvfb-run -a /home/venu/Proposals/Jarvis/automations/pinterest/venv/bin/python main.py run --count 15"
         subprocess.run(["bash", "-c", cmd], check=False)
     except Exception as e:
         logger.error(f"Poster failed: {e}")
