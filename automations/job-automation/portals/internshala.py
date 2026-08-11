@@ -206,25 +206,69 @@ class InternshalaPortal(BasePortal):
             except:
                 pass
 
-            # Already applied?
+            # Already applied? (button flips to "Applied" / "Status: Applied")
             try:
-                if await page.locator(":has-text('Already Applied'), .already_applied").first.is_visible(timeout=1500):
-                    return ApplicationResult(job=job, status="skipped", reason="Already applied")
+                applied_markers = [
+                    ":has-text('Successfully Applied')",
+                    ":has-text('Already Applied')",
+                    "button:has-text('Applied')",
+                    ".internship_status:has-text('Applied')",
+                    ":has-text('Status: Applied')",
+                    ".already_applied",
+                ]
+                for marker in applied_markers:
+                    try:
+                        if await page.locator(marker).first.is_visible(timeout=1200):
+                            return ApplicationResult(job=job, status="skipped", reason="Already applied")
+                    except:
+                        continue
             except:
                 pass
 
-            # Click Apply Now
+            # Click Apply Now — selectors match the live DOM (probed 2026-08-11):
+            # button#easy_apply_button and button#top_easy_apply_button.
             clicked = False
-            for sel in ["#apply_now_btn", ".apply_now_btn", "button:has-text('Apply Now')", "a:has-text('Apply Now')"]:
+            for sel in [
+                "#easy_apply_button",
+                "#top_easy_apply_button",
+                ".top_apply_now_cta",
+                ".detail_page_bottom button",
+                "button:has-text('Apply now')",
+                "button:has-text('Apply Now')",
+                "a:has-text('Apply Now')",
+                ".btn-primary:has-text('Apply')",
+            ]:
                 try:
                     btn = page.locator(sel).first
-                    if await btn.is_visible(timeout=3000):
+                    if await btn.is_visible(timeout=2500):
                         await btn.click()
                         await page.wait_for_timeout(2500)
                         clicked = True
                         break
                 except:
                     continue
+
+            # JS fallback — click the first element whose trimmed text is an apply CTA
+            if not clicked:
+                try:
+                    js_clicked = await page.evaluate("""() => {
+                        const ctas = new Set(['apply now', 'quick apply', 'apply', 'apply for internship']);
+                        const els = Array.from(document.querySelectorAll('button, a, [role="button"], div, span'));
+                        for (const el of els) {
+                            const t = (el.innerText || '').trim().toLowerCase();
+                            if (ctas.has(t)) {
+                                el.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    }""")
+                    if js_clicked:
+                        print("  [JS Fallback] Clicked Internshala Apply via JS")
+                        await page.wait_for_timeout(2500)
+                        clicked = True
+                except:
+                    pass
 
             if not clicked:
                 return ApplicationResult(job=job, status="skipped", reason="Apply button not found")
