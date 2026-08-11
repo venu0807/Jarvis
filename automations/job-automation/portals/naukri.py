@@ -121,7 +121,7 @@ class NaukriPortal(BasePortal):
     # ── Playwright-based job search (bypasses anti-scrape) ────────────────────
 
     async def search_and_apply(self, page: Page, roles: list, cities: list, daily_limit: int,
-                                applied_today: set, context=None, job_filter=None) -> list:
+                                applied_today: set, context=None) -> list:
         """
         Search Naukri for fresh jobs via Playwright after login.
         Returns list of ApplicationResult objects.
@@ -209,9 +209,6 @@ class NaukriPortal(BasePortal):
                         }
 
                         print(f"\n  → {title} @ {company} ({city})")
-                        if job_filter is not None and not await job_filter(job):
-                            print(f"     ⏭️  Skipped: LLM fit filter rejected")
-                            continue
                         try:
                             result = await self.apply_to_job(page, job)
                             results.append(result)
@@ -615,15 +612,7 @@ class NaukriPortal(BasePortal):
                     pass
 
             if apply_btn is None:
-                print("  [Vision Fallback] Attempting to click Apply using AI Vision...")
-                try:
-                    from shared_dom_llm import solve_with_dom_async
-                    await solve_with_dom_async(page, "Click the Apply or Quick Apply button.")
-                    await page.wait_for_timeout(2500)
-                    apply_btn = True
-                except Exception as fe:
-                    print(f"  ⚠️  Vision fallback failed: {fe}")
-                    return ApplicationResult(job=job, status="skipped", reason="No Apply button found")
+                return ApplicationResult(job=job, status="skipped", reason="No Apply button found")
             elif apply_btn is not True:
                 await apply_btn.click()
                 await page.wait_for_timeout(2500)
@@ -1019,14 +1008,9 @@ class NaukriPortal(BasePortal):
                                 await best["locator"].click(force=True)
                                 await page.wait_for_timeout(1000)
                             else:
-                                print(f"     🧠 Playwright unsure. Asking DOM LLM...")
-                                instruction = f"Read the question '{drawer_question}' on screen. The user has the following skills: {self.RESUME_SKILLS}. Find the best matching option and click its radio button/checkbox. If no matching option exists, return 'skip'."
-                                try:
-                                    from shared_dom_llm import solve_with_dom_async
-                                    await solve_with_dom_async(page, instruction)
-                                    await page.wait_for_timeout(1500)
-                                except Exception as fe:
-                                    print(f"     ⚠️  DOM LLM fallback failed: {fe}")
+                                # No rule-based match and no LLM to guess —
+                                # skip this question rather than risk a wrong answer.
+                                print(f"     ⏭️  No rule-based match for question — skipping")
                     except Exception as eo:
                         print(f"     ⚠️ Error in options handler: {eo}")
                 except:

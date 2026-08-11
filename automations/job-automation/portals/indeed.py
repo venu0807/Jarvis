@@ -126,7 +126,7 @@ class IndeedPortal(BasePortal):
     # ── Search and Apply ──────────────────────────────────────────────────────
 
     async def search_and_apply(self, page: Page, roles: list, cities: list,
-                               daily_limit: int, applied_today: set, job_filter=None) -> list:
+                               daily_limit: int, applied_today: set) -> list:
         """
         Search Indeed for jobs inside the logged-in session and auto-apply.
         Returns list of ApplicationResult objects.
@@ -261,9 +261,6 @@ class IndeedPortal(BasePortal):
                         }
 
                         print(f"\n  → {title} @ {company} ({city})")
-                        if job_filter is not None and not await job_filter(job):
-                            print(f"     ⏭️  Skipped: LLM fit filter rejected")
-                            continue
 
                         # ── Open a fresh page per job ─────────────────────────
                         # Keeps the main search page alive regardless of what

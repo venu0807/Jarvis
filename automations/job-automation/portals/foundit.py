@@ -1,6 +1,4 @@
-import asyncio
-from typing import Optional
-from playwright.async_api import Page, TimeoutError
+from playwright.async_api import Page
 
 from .base import BasePortal, ApplicationResult, is_experienced_role
 
@@ -57,52 +55,7 @@ class FounditPortal(BasePortal):
             print(f"  ❌ Foundit login error: {e}")
             return False
 
-    async def apply_to_job(self, page: Page, job: dict) -> ApplicationResult:
-        """
-        Applies to a job using Foundit's Quick Apply.
-        """
-        title = job.get("title", "Unknown Role")
-        company = job.get("company", "Unknown Company")
-        job_url = job.get("url")
-
-        if not job_url:
-            return ApplicationResult(job, "error", "No URL provided")
-
-        try:
-            print(f"  → {title} @ {company}")
-            await page.goto(job_url, timeout=60000)
-            await page.wait_for_timeout(3000)
-
-            # Look for the Apply button
-            apply_btn = page.locator("button:has-text('Quick Apply'), button:has-text('Apply')")
-            if await apply_btn.count() == 0:
-                print(f"     ⚠️  Foundit: Apply button not found.")
-                return ApplicationResult(job, "manual", "No Apply button")
-
-            await apply_btn.first.click()
-            await page.wait_for_timeout(3000)
-
-            # Handle possible popup modals for "Confirm Details"
-            submit_btn = page.locator("button:has-text('Submit'), button:has-text('Confirm')")
-            if await submit_btn.count() > 0:
-                await submit_btn.click()
-                await page.wait_for_timeout(3000)
-
-            # Verify application success (Look for success message)
-            success_msg = page.locator("text='successfully applied', text='Application Sent'")
-            if await success_msg.count() > 0:
-                print(f"     ✅ Foundit Applied: {title} @ {company}")
-                return ApplicationResult(job, "applied")
-            
-            # If no success message but also no obvious manual roadblock
-            print(f"     ✅ Foundit Applied (Assumed): {title} @ {company}")
-            return ApplicationResult(job, "applied")
-
-        except Exception as e:
-            print(f"     ❌ Foundit apply error: {e}")
-            return ApplicationResult(job, "error", str(e))
-
-    async def search_and_apply(self, page: Page, roles: list, cities: list, daily_limit: int, applied_today: set, job_filter=None) -> list:
+    async def search_and_apply(self, page: Page, roles: list, cities: list, daily_limit: int, applied_today: set) -> list:
         """
         Searches for jobs and applies to them.
         """
@@ -121,79 +74,106 @@ class FounditPortal(BasePortal):
                     await page.goto(search_url, timeout=60000)
                     await page.wait_for_timeout(4000)
                     
-                    # Wait for job cards
-                    job_cards = page.locator("div.job-apply-card, div.srpResultCard")
+                    # Wait for job cards (live DOM uses srpResultCardContainer > cardContainer)
+                    job_cards = page.locator("div.srpResultCardContainer div.cardContainer")
                     count = await job_cards.count()
                     if count == 0:
                         continue
-                        
+
                     for i in range(min(count, 15)): # Limit to 15 per search
                         if applied_count >= daily_limit:
                             break
-                            
+
                         card = job_cards.nth(i)
-                        
+
                         try:
-                            title_el = card.locator("h3, .jobTitle").first
-                            title = await title_el.inner_text() if await title_el.count() > 0 else f"Job {i}"
-                            
-                            company_el = card.locator(".companyName").first
-                            company = await company_el.inner_text() if await company_el.count() > 0 else "Unknown"
-                            
-                            link_el = card.locator("a[href*='/job']").first
-                            job_url = await link_el.get_attribute("href") if await link_el.count() > 0 else search_url
-                            if job_url and not job_url.startswith("http"):
-                                job_url = self.base_url + job_url
+                            title_el = card.locator("div.jobTitle, .jobTitle, h2.jobTitle").first
+                            title = (await title_el.inner_text()).strip() if await title_el.count() > 0 else f"Job {i}"
+
+                            company_el = card.locator("div.companyName p, .companyName").first
+                            company = (await company_el.inner_text()).strip() if await company_el.count() > 0 else "Unknown"
+
+                            # Foundit cards have no per-job URL in DOM — apply happens in-card.
+                            # Use the search URL as the job URL for db records.
+                            job_url = search_url
                         except:
                             continue
-                            
+
                         # Generate a deterministic ID based on title and company
                         job_id = f"fi_{title}_{company}".replace(" ", "_").lower()
                         if job_id in applied_today:
                             continue
-                            
+
                         job = {
                             "id": job_id,
                             "title": title,
                             "company": company,
                             "location": city,
                             "url": job_url,
-                            "portal": self.name
+                            "portal": self.name,
                         }
-                        
+
                         if is_experienced_role(title, ""):
                             print(f"     ⏭️  Skipped: Requires experience (not fresher/intern)")
                             continue
-                        if job_filter is not None and not await job_filter(job):
-                            print(f"     ⏭️  Skipped: LLM fit filter rejected")
-                            continue
 
-                        # Some versions of Foundit have quick apply directly on the card
-                        quick_apply_btn = card.locator("button:has-text('Quick Apply')")
-                        if await quick_apply_btn.count() > 0:
-                            await quick_apply_btn.first.click()
-                            await page.wait_for_timeout(3000)
-                            
-                            # Handle confirm modal
-                            submit_btn = page.locator("button:has-text('Submit'), button:has-text('Confirm')")
-                            if await submit_btn.count() > 0:
-                                await submit_btn.click()
-                                await page.wait_for_timeout(3000)
-                                
-                            results.append(ApplicationResult(job, "applied"))
-                            applied_count += 1
-                            applied_today.add(job_id)
-                        else:
-                            # Open job details to apply
-                            result = await self.apply_to_job(page, job)
-                            results.append(result)
-                            if result.status == "applied":
-                                applied_count += 1
-                                applied_today.add(job_id)
-                                
-                            if page.url != search_url:
-                                await page.goto(search_url, timeout=60000)
-                                await page.wait_for_timeout(3000)
+                        # Apply flow: click the card to open the detail panel,
+                        # then click #applyNowBtn inside #applyJobJD.
+                        try:
+                            await card.scroll_into_view_if_needed(timeout=3000)
+                            await card.click()
+                            await page.wait_for_timeout(4000)
+
+                            panel = page.locator("#applyJobJD").first
+                            apply_btn = page.locator("#applyNowBtn").first
+
+                            if not await panel.is_visible(timeout=4000):
+                                print(f"     ⚠️  Foundit: apply panel did not open")
+                                results.append(ApplicationResult(job, "manual", "Apply panel did not open"))
+                            elif not await apply_btn.is_visible(timeout=3000):
+                                print(f"     ⚠️  Foundit: applyNowBtn missing")
+                                results.append(ApplicationResult(job, "manual", "Apply Now button missing"))
+                            else:
+                                await apply_btn.click()
+                                await page.wait_for_timeout(4000)
+
+                                # Success check — handled in modal/snackbar post-click.
+                                body_text = (await page.locator("body").inner_text()).lower()
+                                success_markers = [
+                                    "application sent",
+                                    "successfully applied",
+                                    "applied",
+                                    "application submitted",
+                                ]
+                                already_markers = ["already applied", "already shortlisted"]
+
+                                if any(m in body_text for m in already_markers):
+                                    results.append(ApplicationResult(job, "skipped", "Already applied"))
+                                elif any(m in body_text for m in success_markers):
+                                    print(f"     ✅ Foundit Applied: {title} @ {company}")
+                                    results.append(ApplicationResult(job, "applied"))
+                                    applied_count += 1
+                                    applied_today.add(job_id)
+                                else:
+                                    # No explicit success marker — assume applied (clicked the only CTA).
+                                    print(f"     ✅ Foundit Applied (assumed): {title} @ {company}")
+                                    results.append(ApplicationResult(job, "applied"))
+                                    applied_count += 1
+                                    applied_today.add(job_id)
+                        except Exception as ce:
+                            print(f"     ❌ Foundit apply error: {ce}")
+                            results.append(ApplicationResult(job, "error", str(ce)))
+                        finally:
+                            # Always return to the search listing so the next card click is reliable.
+                            try:
+                                if page.url != search_url:
+                                    await page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
+                                else:
+                                    await page.go_back()
+                                    await page.wait_for_timeout(2000)
+                                await page.wait_for_timeout(2500)
+                            except Exception:
+                                pass
                                 
                 except Exception as e:
                     print(f"  ❌ Foundit search error [{role}/{city}]: {e}")

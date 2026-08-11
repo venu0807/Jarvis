@@ -7,7 +7,6 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from resume_tailor import tailor_resume
 from auto_applier import build_summary
 
 class MockResult:
@@ -37,27 +36,8 @@ def test_build_summary_counts_correctly():
     assert summary["totals"]["errors"] == 1
     assert summary["portal_counts"].get("naukri") == 1
 
-@pytest.mark.llm
-def test_tailor_resume_handles_missing_keys():
-    """QA Test 3: What if the job dictionary is missing critical keys?"""
-    job = {"company": "TestCorp"} # Missing title, description
-    latex_output = tailor_resume(job)
-    assert "\\begin{document}" in latex_output
-
 def test_env_secrets_are_loaded():
     """Security Audit Test: Ensure that credentials aren't checked into version control accidentally."""
     # We shouldn't assert on exact passwords, but ensure the fallback to GMAIL_ADDRESS works.
     email = os.getenv("WELLFOUND_EMAIL", os.getenv("GMAIL_ADDRESS", ""))
     assert email is not None
-
-@pytest.mark.llm
-def test_resume_tailor_compilation_safety():
-    """Security/QA Test: Ensure latex payload injection is escaped properly."""
-    # Test that malicious ampersands or latex injection gets stripped/escaped
-    job = {
-        "title": "Hacker & Developer",
-        "company": "Hack_Me %",
-        "description": "Looking for $1000/hr \\input{/etc/passwd}"
-    }
-    latex_output = tailor_resume(job)
-    assert "\\&" in latex_output or "&" not in latex_output

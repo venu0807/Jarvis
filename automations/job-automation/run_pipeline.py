@@ -2,8 +2,11 @@
 run_pipeline.py — Master pipeline for job automation
 Flow:
   1. Auto-apply on all portals using live search (login ONCE, sessions persist)
-  2. Tailor resumes for manual/skipped jobs only
-  3. Send Email summary (email-only — Telegram removed 2026-06-16)
+  2. Send Email summary (email-only — Telegram removed 2026-06-16)
+
+Resume tailoring (Ollama) and DOM LLM (NVIDIA) removed 2026-08-11.
+Pipeline is purely mechanical (no LLM, no API keys). Manual jobs
+are emailed as plain links, no PDF.
 
 Scheduled at 9:00 AM IST daily via jarvis_scheduler.sh (hour "09" in check_daily).
 Run manually: python run_pipeline.py
@@ -49,48 +52,6 @@ def run(cmd: list, label: str) -> bool:
     if not ok:
         print(f"❌ {label} failed (exit code {result.returncode})")
     return ok
-
-
-# ── Step 3: Resume tailoring (manual jobs only) ───────────────────────────────
-
-def tailor_manual_resumes(summary: dict) -> dict:
-    """
-    For every job in summary['_manual_jobs'] and summary['_skipped_jobs'],
-    tailor a resume and attach the PDF path to summary['manual'].
-    """
-    from resume_tailor import tailor_and_save
-
-    manual_raw   = summary.get("_manual_jobs",   [])
-    skipped_raw  = summary.get("_skipped_jobs",  [])
-    all_manual   = manual_raw + skipped_raw
-
-    if not all_manual:
-        print("  ℹ️  No manual/skipped jobs — skipping resume tailoring")
-        return summary
-
-    print(f"\n  📄 Tailoring {len(all_manual)} resumes for manual/skipped jobs...")
-
-    # Build a mapping from (title, company) → PDF path
-    pdf_map: dict = {}
-    for entry in all_manual:
-        job = entry["job"]
-        try:
-            result = tailor_and_save(job)
-            key = (job["title"].lower(), job["company"].lower())
-            pdf_map[key] = result["resume_pdf"]
-        except Exception as e:
-            print(f"     ⚠️  Tailor error [{job['title']}]: {e}")
-
-    # Attach PDF paths to the manual list in summary
-    updated_manual = []
-    for m in summary.get("manual", []):
-        key = (m["title"].lower(), m["company"].lower())
-        m["resume_pdf"] = pdf_map.get(key, "")
-        updated_manual.append(m)
-    summary["manual"] = updated_manual
-
-    print(f"  ✅ {len(pdf_map)} resumes tailored")
-    return summary
 
 
 # ── Step 0: Cleanup ───────────────────────────────────────────────────────────
@@ -217,7 +178,7 @@ def main():
 ║   🦞 OpenClaw Full Job Pipeline                     ║
 ║   Job Automation Pipeline                            ║
 ║   Date:  {TODAY}                                     ║
-║   Steps: Live Search & Apply → Tailor → Notify       ║
+║   Steps: Live Search & Apply → Filter → Notify       ║
 ╚══════════════════════════════════════════════════════╝
 """)
 
@@ -236,7 +197,7 @@ def main():
         log.info("No portals exceeding 50%% manual/error rate in last 7 days.")
 
     # ── Step 1: Auto-apply (login ONCE, sessions persist) ─────────────────────
-    log.info("Step 1/3 — Auto-applying (all portals, live search)")
+    log.info("Step 1/2 — Auto-applying (all portals, live search)")
     try:
         # Import and run async main directly (avoids subprocess overhead)
         import auto_applier
@@ -258,17 +219,13 @@ def main():
                        "totals": {"applied": 0, "manual_total": 0, "errors": 0},
                        "_manual_jobs": [], "_skipped_jobs": []}
 
-    # ── Step 2: Tailor resumes for manual/skipped jobs only ───────────────────
-    log.info("Step 2/3 — Tailoring resumes for manual jobs")
-    summary = tailor_manual_resumes(summary)
-
-    # Save enriched summary (with PDF paths)
+    # ── Step 2: Save summary ───────────────────────────────────────────────────
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     LOG_FILE.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     log.info("Application log updated → %s", LOG_FILE.name)
 
     # ── Step 3: Send notifications (email-only) ─────────────────────────────────
-    log.info("Step 3/3 — Sending email summary")
+    log.info("Step 2/2 — Sending email summary")
     from notifier import notify
     notify(summary)
 
@@ -278,11 +235,10 @@ def main():
 ╔══════════════════════════════════════════════════════╗
 ║   ✅ Pipeline Complete!                              ║
 ║   Auto-applied:   {str(t['applied']).ljust(5)} jobs                    ║
-║   Apply manually: {str(t['manual_total']).ljust(5)} jobs (email + PDF ready)  ║
+║   Apply manually: {str(t['manual_total']).ljust(5)} jobs (in email)    ║
 ║   Errors:         {str(t['errors']).ljust(5)}                          ║
 ║                                                      ║
 ║   📧  {os.getenv('GMAIL_ADDRESS', 'No Email')}                               ║
-║   📁  output/resumes/                                ║
 ╚══════════════════════════════════════════════════════╝
 """)
 

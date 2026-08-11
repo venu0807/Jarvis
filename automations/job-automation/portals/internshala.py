@@ -95,7 +95,7 @@ class InternshalaPortal(BasePortal):
 
     # ── Apply ─────────────────────────────────────────────────────────────────
 
-    async def search_and_apply(self, page: Page, roles: list, cities: list, limit: int, applied_today: set, job_filter=None) -> list:
+    async def search_and_apply(self, page: Page, roles: list, cities: list, limit: int, applied_today: set) -> list:
         results = []
         applied = 0
         
@@ -158,9 +158,6 @@ class InternshalaPortal(BasePortal):
                 
                 if is_experienced_role(job['title'], ""):
                     print(f"     ⏭️  Skipped: Requires experience (not fresher/intern)")
-                    continue
-                if job_filter is not None and not await job_filter(job):
-                    print(f"     ⏭️  Skipped: LLM fit filter rejected")
                     continue
 
                 try:

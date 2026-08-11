@@ -26,15 +26,12 @@ sys.path.append(str(BASE_DIR.parent.parent))
 from dotenv import load_dotenv
 from jarvis_browser import AsyncBrowser, safe_close_async
 
-# Active portals (8 total, post 2026-06-15 cut).
-# Career pages over took the linkedin/glassdoor-apply share: aggregator
-# JSON APIs (Greenhouse/Lever/Ashby/Recruitee) auto-apply for free, and
-# the catalog covers ~10k companies custom-ATS placeholders included.
-# Re-enabling a cut portal: rerun scripts/apply_portal_cuts.py --restore <name>
-# (kept as a noop harness if the cut script is removed; restoration is manual).
+# Active portals (4, post 2026-08-11 cut: removed cutshort/freshersworld/
+# wellfound/career_pages/workday — re-login burden + aggregator auth-less
+# niches not worth the maintenance). Re-enabling a cut portal: restore the
+# module + re-add to CREDS/portal_map.
 from portals import (NaukriPortal, InternshalaPortal, IndeedPortal,
-                     FounditPortal, CutshortPortal,
-                     FreshersworldPortal, WellfoundPortal, CareerPagePortal, WorkdayPortal)
+                     FounditPortal)
 from db_logger import save_jobs_to_db
 
 # ── Load .env ─────────────────────────────────────────────────────────────────
@@ -67,11 +64,6 @@ CREDS = {
     "internshala":   {"email": os.getenv("INTERNSHALA_EMAIL", ""),  "password": os.getenv("INTERNSHALA_PASSWORD", "")},
     "indeed":        {"email": os.getenv("INDEED_EMAIL", ""),        "password": os.getenv("INDEED_PASSWORD", "")},
     "foundit":       {"email": os.getenv("FOUNDIT_EMAIL", ""),       "password": os.getenv("FOUNDIT_PASSWORD", "")},
-    "cutshort":      {"email": os.getenv("CUTSHORT_EMAIL", os.getenv("GMAIL_ADDRESS", "")),       "password": os.getenv("CUTSHORT_PASSWORD", "")},
-    "freshersworld": {"email": os.getenv("FRESHERSWORLD_EMAIL", os.getenv("GMAIL_ADDRESS", "")), "password": os.getenv("FRESHERSWORLD_PASSWORD", "")},
-    "wellfound":     {"email": os.getenv("WELLFOUND_EMAIL", os.getenv("GMAIL_ADDRESS", "")),    "password": os.getenv("WELLFOUND_PASSWORD", "")},
-    "career_pages":  {"email": os.getenv("GMAIL_ADDRESS", ""),       "password": ""},  # aggregator APIs are public
-    "workday":       {"email": "",       "password": ""},  # public search, no auth needed
 }
 
 BASE_DIR    = Path(__file__).parent
@@ -108,11 +100,9 @@ async def run_portal(portal_name: str, portal_cls, context) -> tuple[list, bool]
     session gets a one-time manual re-login instead of silently returning 0.
     """
     cred = CREDS[portal_name]
-    # Skip credential check for portals that don't need auth (Workday, CareerPages)
-    if portal_name not in ("workday", "career_pages"):
-        if not cred["email"] or not cred["password"]:
-            print(f"\n⚠️  {portal_name}: credentials not set in .env — skipping")
-            return [], False
+    if not cred["email"] or not cred["password"]:
+        print(f"\n⚠️  {portal_name}: credentials not set in .env — skipping")
+        return [], False
 
     portal  = portal_cls(email=cred["email"], password=cred["password"])
     page    = await context.new_page()
@@ -131,23 +121,17 @@ async def run_portal(portal_name: str, portal_cls, context) -> tuple[list, bool]
         # daily_limit, applied_today). Naukri additionally takes context= for
         # page-recovery on crash; the others don't. (Previously this was 6
         # copy-pasted branches + a scraped-jobs fallback that was dead in the
-        # daily run because `jobs` was always empty without --job-file — which
-        # silently disabled cutshort/freshersworld/wellfound.)
+        # daily run because `jobs` was always empty without --job-file.)
         #
-        # Optional LLM job-fit filter — opt-in via LLM_FILTER=1. None by
-        # default, so portal behavior is unchanged unless explicitly enabled.
-        from portals.fit_filter import make_filter
-        job_filter = make_filter(enabled=os.getenv("LLM_FILTER", "0") == "1")
-
         applied_today = load_applied()
         if portal_name == "naukri":
             results = await portal.search_and_apply(
                 page, ROLES, CITIES, DAILY_LIMIT, applied_today,
-                context=context, job_filter=job_filter
+                context=context
             )
         else:
             results = await portal.search_and_apply(
-                page, ROLES, CITIES, DAILY_LIMIT, applied_today, job_filter=job_filter
+                page, ROLES, CITIES, DAILY_LIMIT, applied_today
             )
         save_applied({r.job["id"] for r in results if r.status == "applied"})
         return results, True
@@ -265,7 +249,7 @@ async def main():
     if not _acquire_run_lock():
         return
     parser = argparse.ArgumentParser(description="OpenClaw Auto-Apply Engine")
-    parser.add_argument("--portal",   help="Run one portal only: naukri|internshala|indeed|foundit|cutshort|freshersworld|wellfound|career_pages|workday")
+    parser.add_argument("--portal",   help="Run one portal only: naukri|internshala|indeed|foundit")
     parser.add_argument("--headful",  action="store_true", help="Run with a visible browser (overrides HEADLESS=.env)")
     args = parser.parse_args()
 
@@ -292,11 +276,6 @@ async def main():
         "internshala":   InternshalaPortal,
         "indeed":        IndeedPortal,
         "foundit":       FounditPortal,
-        "cutshort":      CutshortPortal,
-        "freshersworld": FreshersworldPortal,
-        "wellfound":     WellfoundPortal,
-        "career_pages":  CareerPagePortal,
-        "workday":       WorkdayPortal,
     }
     if args.portal:
         if args.portal not in portal_map:
@@ -317,8 +296,7 @@ async def main():
             try:
                 results, session_ok = await run_portal(name, cls, context)
                 all_results.extend(results)
-                # Auth-less aggregator portals don't need re-login
-                if not session_ok and name not in ("workday", "career_pages"):
+                if not session_ok:
                     needs_relogin.append(name)
                 await browser_mgr.save_session(context, session_file)
             except Exception as e:

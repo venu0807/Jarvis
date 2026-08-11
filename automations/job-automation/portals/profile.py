@@ -52,14 +52,11 @@ _PROFILE = load_profile()
 
 
 def resolve_resume_path() -> Optional[str]:
-    """Locate the resume PDF: env override → home ~/V/<name>.pdf → newest PDF
-    under the resume_tailor output dir. Shared by workday + career_pages.
+    """Locate the resume PDF: env override → home ~/V/<name>.pdf.
 
-    WARNING: output/resumes holds per-company Tailored_* PDFs (built by
-    resume_tailor). Falling back to the newest one means a resume tailored for
-    a DIFFERENT company gets submitted. Set RESUME_PDF_PATH in .env to a
-    neutral base resume to avoid this; the fallback here only exists so the
-    apply flow still has *something* and is deliberately loud about it.
+    Per-company resume tailoring was removed 2026-08-11; a single neutral
+    base resume is used for every application. Set RESUME_PDF_PATH in .env
+    to point at your base resume.
     """
     explicit = _PROFILE.get("resume_pdf") or os.environ.get("RESUME_PDF_PATH")
     if explicit and Path(explicit).exists():

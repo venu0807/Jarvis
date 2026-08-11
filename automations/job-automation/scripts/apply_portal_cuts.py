@@ -13,7 +13,7 @@ What this script does NOW: archives a one-cycle retention strategy.
                        copy back and re-add the entries to auto_applier.py
                        (portal_map, imports, CREDS) — the restored class MUST
                        implement search_and_apply(page, roles, cities,
-                       daily_limit, applied_today, job_filter=None), because
+                       daily_limit, applied_today), because
                        run_portal now dispatches EVERY portal through it (the
                        old per-portal if-branches are gone). This script is
                        the GUIDE for that.
