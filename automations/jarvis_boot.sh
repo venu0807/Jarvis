@@ -29,6 +29,6 @@ su - venu -c "cd /home/venu/Proposals/Jarvis/automations/interview_scheduler_pre
 su - venu -c "nohup /usr/local/bin/n8n start > /dev/null 2>&1 &"
 
 # 5. Start Streamlit Mission Control Dashboard (runs as venu)
-su - venu -c "cd /home/venu/Proposals/Jarvis && nohup /home/venu/miniconda3/bin/streamlit run automations/dashboard/jarvis_ui.py --server.port 8501 --server.headless true > /dev/null 2>&1 &"
+su - venu -c "cd /home/venu/Proposals/Jarvis && nohup /home/venu/miniconda3/bin/streamlit run automations/dashboard/jarvis_ui.py --server.port 8501 --server.headless true > /tmp/streamlit.log 2>&1 &"
 
 echo "Jarvis is fully online."
