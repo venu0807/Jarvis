@@ -11,8 +11,8 @@ sed -i '/imap_scanner.py/d' $CRON_FILE
 sed -i '/run_pipeline.py/d' $CRON_FILE
 
 echo "# Jarvis Ghost Protocol" >> $CRON_FILE
-echo "*/15 * * * * cd /home/venu/Proposals/Jarvis/automations/inbox-monitor && /usr/bin/python3 imap_scanner.py >> /home/venu/Proposals/Jarvis/automations/jarvis_cron.log 2>&1" >> $CRON_FILE
-echo "0 9 * * * cd /home/venu/Proposals/Jarvis/automations/job-automation && /usr/bin/python3 run_pipeline.py >> /home/venu/Proposals/Jarvis/automations/jarvis_cron.log 2>&1" >> $CRON_FILE
+echo "*/15 * * * * cd /home/venu/Proposals/Jarvis/automations/inbox-monitor && /home/venu/miniconda3/bin/python3 imap_scanner.py >> /home/venu/Proposals/Jarvis/automations/jarvis_cron.log 2>&1" >> $CRON_FILE
+echo "0 9 * * * cd /home/venu/Proposals/Jarvis/automations/job-automation && /home/venu/miniconda3/bin/python3 run_pipeline.py >> /home/venu/Proposals/Jarvis/automations/jarvis_cron.log 2>&1" >> $CRON_FILE
 
 crontab $CRON_FILE
 rm $CRON_FILE
