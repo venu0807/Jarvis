@@ -3,7 +3,7 @@ import base64
 from openai import OpenAI
 
 def test_nvidia():
-    api_key = "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"
+    api_key = os.getenv("NVIDIA_API_KEY")
     
     print("🚀 Initializing NVIDIA NIM Client...")
     client = OpenAI(

@@ -4,7 +4,7 @@ from google.genai import types
 
 def test_gemini_image():
     # Use the user's provided API key
-    api_key = "AQ.Ab8RN6Lxt03KUu3PUM4d3zB7dyTi9gezbqymPJRER6baoXZ8Eg"
+    api_key = os.getenv("GEMINI_API_KEY")
     
     print("🚀 Initializing Gemini Client...")
     client = genai.Client(api_key=api_key)
