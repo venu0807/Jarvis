@@ -9,7 +9,27 @@ PATH="$HOME/bin:$PATH"
 LOG_FILE="/home/venu/Proposals/Jarvis/logs/jarvis_scheduler.log"
 mkdir -p /home/venu/Proposals/Jarvis/logs
 
+# Windows toast when PowerShell is reachable from WSL; no-op otherwise
+notify_win() {
+    local PS="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+    if [ -x "$PS" ]; then
+        "$PS" -ExecutionPolicy Bypass -File "\\wsl.localhost\Ubuntu\home\venu\Proposals\Jarvis\scripts\windows_toast.ps1" -Title "Jarvis OS" -Message "$1" >/dev/null 2>&1
+    fi
+}
+
 echo "[$(date)] Scheduler poll triggered..." >> "$LOG_FILE"
+
+# Wait for network connectivity (max 60 seconds) to prevent Wake-Up failures
+max_wait=60
+waited=0
+while ! ping -c 1 -W 2 8.8.8.8 &> /dev/null; do
+    if [ "$waited" -ge "$max_wait" ]; then
+        echo "[$(date)] ⚠️ Network timeout after ${max_wait}s. Proceeding anyway..." >> "$LOG_FILE"
+        break
+    fi
+    sleep 5
+    waited=$((waited + 5))
+done
 
 # ------------------------------------------------------------------------------
 # Daily Job Checker
@@ -38,7 +58,20 @@ check_daily() {
         if [ "$LAST_RUN" != "$CURRENT_DATE" ]; then
             echo "$CURRENT_DATE" > "$STATE_FILE"
             echo "[$(date)] 🚀 CATCH-UP TRIGGER: Running $JOB_ID..." >> "$LOG_FILE"
-            ( eval "$COMMAND" || python3 /home/venu/Proposals/Jarvis/alert_manager.py add "$JOB_ID" "Failed to execute successfully" ) &
+            ( 
+                START_TIME=$(date +%s)
+                if eval "$COMMAND"; then
+                    END_TIME=$(date +%s)
+                    DURATION=$((END_TIME - START_TIME))
+                    python3 /home/venu/Proposals/Jarvis/telemetry.py "$JOB_ID" "SUCCESS" "$DURATION"
+                    notify_win "✅ Automation Completed: $JOB_ID"
+                else
+                    END_TIME=$(date +%s)
+                    DURATION=$((END_TIME - START_TIME))
+                    python3 /home/venu/Proposals/Jarvis/telemetry.py "$JOB_ID" "FAILURE" "$DURATION"
+                    python3 /home/venu/Proposals/Jarvis/alert_manager.py add "$JOB_ID" "Failed to execute successfully"
+                fi 
+            )
         fi
     fi
 }
@@ -61,7 +94,20 @@ check_interval() {
     if [ "$DIFF" -ge "$INTERVAL_SEC" ]; then
         echo "$CURRENT_TIMESTAMP" > "$STATE_FILE"
         echo "[$(date)] 🚀 INTERVAL TRIGGER: Running $JOB_ID..." >> "$LOG_FILE"
-        ( eval "$COMMAND" || python3 /home/venu/Proposals/Jarvis/alert_manager.py add "$JOB_ID" "Failed to execute successfully" ) &
+        ( 
+            START_TIME=$(date +%s)
+            if eval "$COMMAND"; then
+                END_TIME=$(date +%s)
+                DURATION=$((END_TIME - START_TIME))
+                python3 /home/venu/Proposals/Jarvis/telemetry.py "$JOB_ID" "SUCCESS" "$DURATION"
+                notify_win "✅ Automation Completed: $JOB_ID"
+            else
+                END_TIME=$(date +%s)
+                DURATION=$((END_TIME - START_TIME))
+                python3 /home/venu/Proposals/Jarvis/telemetry.py "$JOB_ID" "FAILURE" "$DURATION"
+                python3 /home/venu/Proposals/Jarvis/alert_manager.py add "$JOB_ID" "Failed to execute successfully"
+            fi 
+        )
     fi
 }
 

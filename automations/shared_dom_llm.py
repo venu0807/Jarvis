@@ -48,7 +48,7 @@ def _build_text_payload(dom_text, instruction):
         "Do not output markdown block ticks, just raw JSON. DO NOT summarize or truncate the text to type."
     )
     return {
-        "model": "meta/llama-3.2-90b-vision-instruct", # Works perfectly for text-only too
+        "model": "meta/llama-3.1-8b-instruct", # text-only DOM Q — 8b fast, 90b-vision hung
         "messages": [
             {
                 "role": "system",
@@ -83,11 +83,21 @@ async def solve_with_dom_async(page, instruction: str):
     payload = _build_text_payload(dom_text, instruction)
     
     # Run sync request in a background thread to not block async loop
-    response = await asyncio.to_thread(
-        requests.post, url, headers=headers, json=payload
-    )
-    data = response.json()
-            
+    # timeout: NVIDIA 90b-vision hung indefinitely with no timeout — cap it
+    # so a slow/rate-limited completion skips the question instead of stalling
+    # the whole pipeline.
+    try:
+        response = await asyncio.to_thread(
+            requests.post, url, headers=headers, json=payload, timeout=30
+        )
+        data = response.json()
+    except Exception as e:
+        print(f"  -> DOM LLM call failed ({e}); skipping question")
+        return
+    if 'choices' not in data:
+        print(f"  -> DOM LLM no choices ({data}); skipping question")
+        return
+
     content = data['choices'][0]['message']['content'].strip()
     action_data = _parse_response(content)
     action = action_data.get('action')
@@ -126,9 +136,16 @@ def solve_with_dom_sync(page, instruction: str):
     headers = {"Authorization": f"Bearer {get_nvidia_key()}", "Content-Type": "application/json"}
     payload = _build_text_payload(dom_text, instruction)
     
-    response = requests.post(url, headers=headers, json=payload)
-    data = response.json()
-    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        data = response.json()
+    except Exception as e:
+        print(f"  -> DOM LLM call failed ({e}); skipping question")
+        return
+    if 'choices' not in data:
+        print(f"  -> DOM LLM no choices ({data}); skipping question")
+        return
+
     content = data['choices'][0]['message']['content'].strip()
     action_data = _parse_response(content)
     action = action_data.get('action')

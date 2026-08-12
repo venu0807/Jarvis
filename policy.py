@@ -209,13 +209,12 @@ def audit_redact(text: str, aggressiveness: str | None = None) -> PIIFinding:
 def redact_for_cloud(text: str, finding: PIIFinding) -> str:
     """Replace PII with safe placeholder before sending to cloud."""
     out = text
-    for pii_type, _ in f.pii_types:
-        for pii_type, pattern in PII_PATTERNS:
-            if pii_type == pii_type:  # noqa - just iterate
-                pass
-            out = pattern.sub(f"[{pii_type.upper()}_REDACTED]", out)
+    for pii_type in finding.pii_types:
+        for p_type, pattern in PII_PATTERNS:
+            if pii_type == p_type:
+                out = pattern.sub(f"[{pii_type.upper()}_REDACTED]", out)
     # Venu-domain plain keywords → underscore them but keep readable
-    for kw in f.domain_hits:
+    for kw in finding.domain_hits:
         out = re.sub(re.escape(kw), f"[{kw.upper()}_REDACTED]", out, flags=re.IGNORECASE)
     return out
 

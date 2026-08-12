@@ -107,6 +107,10 @@ class BrowserConfig:
     def launch_args(self) -> list:
         """Combine standard args with mode-specific args and any extras."""
         args = list(BROWSER_LAUNCH_ARGS)
+        if not self.headless:
+            # Headful but unobtrusive: start minimized so the automation
+            # browser sits in the taskbar instead of stealing the screen.
+            args.append("--start-minimized")
         args.extend(self.extra_args)
         return args
 

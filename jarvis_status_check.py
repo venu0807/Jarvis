@@ -11,7 +11,8 @@ print('=============================================\n')
 # 1. Check PostgreSQL
 try:
     import psycopg2
-    from config import DB_PARAMS
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'automations', 'dashboard'))
+    from init_db import DB_PARAMS
     conn = psycopg2.connect(**DB_PARAMS)
     print('✅ [1/5] Database (PostgreSQL): ONLINE and reachable')
     conn.close()

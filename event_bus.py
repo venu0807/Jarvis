@@ -1,4 +1,5 @@
 import json
+import os
 import psycopg2
 import logging
 from typing import Callable, Any, Dict
@@ -9,10 +10,10 @@ class EventBus:
     def __init__(self):
         # We now connect directly to PostgreSQL instead of Redis!
         self.db_params = {
-            'dbname': 'pinterest_db',
-            'user': 'venu',
-            'password': 'venu',
-            'host': '127.0.0.1'
+            'dbname': os.getenv('JARVIS_DB_NAME', 'pinterest_db'),
+            'user': os.getenv('JARVIS_DB_USER', 'venu'),
+            'password': os.getenv('JARVIS_DB_PASS', 'venu'),
+            'host': os.getenv('JARVIS_DB_HOST', '127.0.0.1')
         }
 
     def publish(self, channel: str, event_type: str, payload: Dict[str, Any]) -> bool:

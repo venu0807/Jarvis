@@ -159,23 +159,18 @@ def orchestrator_loop():
             last_run_hours.clear()
 
         if current_hour not in last_run_hours:
+            last_run_hours.add(current_hour)
+
             if current_hour == 2:
                 threading.Thread(target=run_pinterest_scraper).start()
-                last_run_hours.add(current_hour)
-            
             elif current_hour == 7:  # 7 AM: Morning Inbox Triage
                 threading.Thread(target=run_inbox_triage).start()
-                last_run_hours.add(current_hour)
-                
             elif current_hour in [8, 12, 18, 22]:
                 threading.Thread(target=run_pinterest_poster).start()
-                last_run_hours.add(current_hour)
-                
             elif current_hour == 23: # 11 PM: Finance & Memory Sync
                 threading.Thread(target=run_finance_sync).start()
                 threading.Thread(target=run_memory_sync).start()
-                last_run_hours.add(current_hour)
-        
+
         # Sleep for 1 minute before checking schedule again
         time.sleep(60)
 
