@@ -89,7 +89,7 @@ def fetch_amazon_image(asin: str) -> Optional[str]:
                     let src = img.getAttribute("src");
                     if (src && !src.includes("play-button") && !src.includes("transparent")) {
                         // Convert thumbnail url to raw high-res original url
-                        let hiRes = src.replace(/\._.*_\./, ".");
+                        let hiRes = src.replace(/\\._.*_\\./, ".");
                         urls.push(hiRes);
                     }
                 }

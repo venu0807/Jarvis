@@ -65,7 +65,7 @@ BASE_LATEX_CHEATSHEET = r"""\documentclass[11pt,a4paper]{article}
 \end{document}
 """
 
-PROMPT_TEMPLATE = """
+PROMPT_TEMPLATE = r"""
 You are an expert technical recruiter and senior engineering manager.
 Based on the following email offering an interview or assessment to the candidate, generate a highly targeted Interview Cheat Sheet.
 
