@@ -105,3 +105,15 @@ backups/openclaw-workspace-20260616.tar.gz
 backups/20260614-182854/openclaw.json
 automations/ecommerce/affiliate-store/
 automations/linkedin-outreach/sent_tracker.db
+
+# ==============================================================================
+# RUNTIME STATE — regenerated every run, never commit
+# ==============================================================================
+logs/.state_*
+logs/alerts.json
+automations/inbox-monitor/processed_emails.json
+automations/ghost-networker/.seen_events.json
+automations/pinterest/trending_cache.json
+automations/pinterest/debug_upload.html
+automations/pinterest/failed_publish.png
+.claude-flow/
