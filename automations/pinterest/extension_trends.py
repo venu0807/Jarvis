@@ -1,13 +1,17 @@
 import os
 import time
 import random
+from pathlib import Path
 import pandas as pd
 from bs4 import BeautifulSoup
 from jarvis_browser import SyncBrowser
 from amazon_scraper import scrape_amazon
 
 CSV_FILE = "data.csv"
-USER_DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", "C:\\Users\\Venu\\AppData\\Local"), "AmazonBot")
+# LOCALAPPDATA set on real Windows; under WSL fall back to a real Linux path
+# (the old "C:\Users\..." fallback materialized a literal backslash dir inside
+# the repo).
+USER_DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", str(Path.home() / ".cache")), "AmazonBot")
 
 def get_pinterest_trends():
     print('Launching Stealth Browser to scrape Pinterest Trends...')

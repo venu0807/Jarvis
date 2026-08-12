@@ -1,13 +1,17 @@
 import os
 import time
 import re
+from pathlib import Path
 import pandas as pd
 from database import get_products_df, save_products_df
 from jarvis_browser import SyncBrowser
 from bs4 import BeautifulSoup
 
 CSV_FILE = "data.csv"
-USER_DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", "C:\\Users\\Venu\\AppData\\Local"), "AmazonBot")
+# LOCALAPPDATA set on real Windows; under WSL fall back to a real Linux path
+# (the old "C:\Users\..." fallback materialized a literal backslash dir inside
+# the repo).
+USER_DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", str(Path.home() / ".cache")), "AmazonBot")
 AFFILIATE_TAG = "venu080d-21"
 
 from get_pinterest_trends import get_trending_keywords
