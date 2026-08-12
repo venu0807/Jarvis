@@ -1,3 +1,4 @@
+import hashlib
 from playwright.async_api import Page
 
 from .base import BasePortal, ApplicationResult, is_experienced_role
@@ -99,8 +100,9 @@ class FounditPortal(BasePortal):
                         except:
                             continue
 
-                        # Generate a deterministic ID based on title and company
-                        job_id = f"fi_{title}_{company}".replace(" ", "_").lower()
+                        # Generate a deterministic ID based on the job URL or title/company
+                        url_hash = hashlib.sha256(job_url.encode()).hexdigest()[:10]
+                        job_id = f"fi_{url_hash}_{title}_{company}".replace(" ", "_").lower()
                         if job_id in applied_today:
                             continue
 
