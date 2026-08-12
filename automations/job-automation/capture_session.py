@@ -19,17 +19,13 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 SESSION_DIR = BASE_DIR / ".sessions"
 
-VALID = {"naukri", "internshala", "indeed", "foundit",
-         "cutshort", "freshersworld", "wellfound"}
+VALID = {"naukri", "internshala", "indeed", "foundit"}
 
 PORTAL_URL = {
     "naukri": "https://www.naukri.com",
     "internshala": "https://internshala.com/login/student",
     "indeed": "https://in.indeed.com",
     "foundit": "https://www.foundit.in",
-    "cutshort": "https://cutshort.io/login",
-    "freshersworld": "https://www.freshersworld.com/login",
-    "wellfound": "https://wellfound.com/login",
 }
 
 LOGIN_MARKERS = [

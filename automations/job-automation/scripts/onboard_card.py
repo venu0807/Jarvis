@@ -73,11 +73,9 @@ cd ~/Proposals/Jarvis/automations/job-automation
 
 python scripts/headful_reauth.py             # Refresh ALL session cookies (browser opens, you solve CAPTCHA)
 python scripts/headful_reauth.py --only indeed,internshala
-python scripts/headful_reauth.py --skip cutshort,freshersworld
 python validate_sessions.py                   # Read-only cookie health
 python scripts/weekly_compare.py             # Pre vs post portal stats
 python scripts/onboard_card.py --print       # Re-print this card
-python auto_applier.py --portal career_pages # Aggregator auto-apply: Greenhouse/Lever/Ashby/Recruitee
 python run_pipeline.py                       # Full pipeline (apply + tailor + email)
 
 ═══════════════════════════════════════════════

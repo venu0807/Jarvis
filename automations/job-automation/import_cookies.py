@@ -20,8 +20,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 SESSION_DIR = BASE_DIR / ".sessions"
 
-VALID = {"naukri", "internshala", "indeed", "foundit",
-         "cutshort", "freshersworld", "wellfound"}
+VALID = {"naukri", "internshala", "indeed", "foundit"}
 
 
 def _parse_netscape(text: str) -> list:

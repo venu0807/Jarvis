@@ -3,7 +3,7 @@
 An automated pipeline designed to streamline the job search and application process. It handles everything from live-searching job listings across multiple portals to automatically applying, answering screening questions, tailoring resumes dynamically with AI, and sending an Email summary with the day's actions.
 
 ## 🌟 Features
-- **Live Search & Auto Apply Engine**: Automates the search, login, and application process using Playwright. Navigates native application forms for active portals (LinkedIn outreach continues via `linkedin-outreach/`; see `portals/__init__.py` for the cut list). Active portals: Naukri, Internshala, Indeed, Foundit, Cutshort, Freshersworld, Wellfound, and **CareerPages** (aggregator JSON APIs for Greenhouse / Lever / Ashby / Recruitee + custom ATS placeholders).
+- **Live Search & Auto Apply Engine**: Automates the search, login, and application process using Playwright. Navigates native application forms for active portals (LinkedIn outreach continues via `linkedin-outreach/`; see `portals/__init__.py` for the cut list). Active portals: Naukri, Internshala, Indeed, Foundit.
 - **Smart Form Auto-Fill**: Automatically detects and answers screening questions on portals (e.g., filling in Fresher, 0 CTC, education, skills, and Yes/No questions).
 - **External Site Detection**: Safely detects and skips applications that redirect to external company websites, logging them for manual review to prevent browser crashes.
 - **AI Resume Tailoring**: Employs a local **Ollama** model to adapt and inject ATS-friendly keywords into a custom LaTeX resume. A local Tectonic compiler is automatically downloaded to stitch and compile pixel-perfect PDFs for manual applications.
@@ -82,7 +82,6 @@ If you want to run specific parts of the project:
   - **Only run auto applier**:
     ```bash
     python auto_applier.py --portal foundit             # single portal, headless
-    python auto_applier.py --portal career_pages        # aggregator auto-apply
     python auto_applier.py --portal foundit --headful   # single portal, visible browser
     ```
   - **Only tailor resumes**:

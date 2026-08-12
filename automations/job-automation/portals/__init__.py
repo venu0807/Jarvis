@@ -11,38 +11,22 @@ Cut list (2026-06-15, FINAL — kept here only for visibility; restoration via
   - UnstopPortal:    11.1% apply rate over 18 jobs — too few jobs to be
     worth the headful-reauth maintenance.
 
-Active (8):
+Active (4, post 2026-08-11 cut):
   - NaukriPortal, FounditPortal — strong B2B engines
   - IndeedPortal, InternshalaPortal — keep + tune
-  - CutshortPortal, FreshersworldPortal, WellfoundPortal — niche but
-    occasionally surface fresher roles
-  - CareerPagePortal — aggregator JSON APIs (Greenhouse/Lever/Ashby/Recruitee)
-    + custom POST apply endpoints. Real auto-apply via `career_pages_apply.py`.
 
-Note: cut portal source kept in `.cut-2026-06-15/` for one cycle. After you
-verify everything works without them, run:
-    python scripts/apply_portal_cuts.py --finalize --i-know-what-im-doing
-That removes the staging directory and the script itself.
+Removed 2026-08-11: Cutshort, Freshersworld, Wellfound (re-login burden),
+CareerPages aggregator, Workday — not worth maintenance for the apply yield.
 """
 
 from .naukri import NaukriPortal
 from .internshala import InternshalaPortal
 from .indeed import IndeedPortal
 from .foundit import FounditPortal
-from .cutshort import CutshortPortal
-from .freshersworld import FreshersworldPortal
-from .wellfound import WellfoundPortal
-from .career_pages import CareerPagePortal
-from .workday import WorkdayPortal
 
 __all__ = [
     "NaukriPortal",
     "InternshalaPortal",
     "IndeedPortal",
     "FounditPortal",
-    "CutshortPortal",
-    "FreshersworldPortal",
-    "WellfoundPortal",
-    "CareerPagePortal",
-    "WorkdayPortal",
 ]

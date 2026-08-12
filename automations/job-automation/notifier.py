@@ -60,11 +60,6 @@ def build_html(summary: dict) -> str:
     manual_rows = ""
     for j in summary.get("manual", []):
         apply_link = f"<a href='{j['url']}' style='color:#1a73e8;font-weight:bold'>Apply →</a>" if j.get("url") else "—"
-        pdf_link = ""
-        if j.get("resume_pdf"):
-            p = Path(j["resume_pdf"])
-            p_url = str(p).replace("\\", "/")
-            pdf_link = f"<a href='file:///{p_url}' style='color:#0a7c4a'>📄 PDF</a>"
         reason = j.get("reason", "") or ""
         manual_rows += (
             f"<tr>"
@@ -73,7 +68,6 @@ def build_html(summary: dict) -> str:
             f"<td style='padding:6px 8px'>{j['portal']}</td>"
             f"<td style='padding:6px 8px'>{reason}</td>"
             f"<td style='padding:6px 8px'>{apply_link}</td>"
-            f"<td style='padding:6px 8px;text-align:center'>{pdf_link}</td>"
             f"</tr>"
         )
     if not manual_rows:
@@ -151,7 +145,6 @@ def build_html(summary: dict) -> str:
     <th style='padding:6px 8px'>Portal</th>
     <th style='padding:6px 8px'>Reason</th>
     <th style='padding:6px 8px'>Link</th>
-    <th style='padding:6px 8px'>Resume PDF</th>
   </tr>
   {manual_rows}
 </table>
@@ -159,7 +152,7 @@ def build_html(summary: dict) -> str:
 {relogin_banner}
 
 <p style='color:#aaa;font-size:11px;margin-top:28px'>
-  🦞 OpenClaw + Ollama {os.getenv("OLLAMA_MODEL","phi4-mini")} — 100% local, zero data leakage · Email-only notifications
+  🦞 Job Pipeline — Email-only notifications
 </p>
 </body></html>"""
 
@@ -176,8 +169,7 @@ def build_plain(summary: dict) -> str:
     manual_lines = "\n".join(
         f"  • {j['title']} @ {j['company']} ({j['portal']})\n"
         f"    Reason: {j.get('reason', '')}\n"
-        f"    Apply: {j.get('url','')}" +
-        (f"\n    PDF:   {j['resume_pdf']}" if j.get("resume_pdf") else "")
+        f"    Apply: {j.get('url','')}"
         for j in summary.get("manual", [])
     ) or "  None"
 
@@ -192,10 +184,10 @@ Per-portal auto-applied:
 AUTO-APPLIED (no action needed):
 {applied_lines}
 
-APPLY MANUALLY (tailored PDF attached to each):
+APPLY MANUALLY (one click each):
 {manual_lines}
 
-— OpenClaw + Ollama (100% local) 🦞 · Email-only notifications
+— Job Pipeline · Email-only notifications
 """
 
 

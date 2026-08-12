@@ -40,21 +40,17 @@ load_dotenv(PROJ_DIR / ".env")
 from portals import (
     FounditPortal,
     IndeedPortal,
-    CutshortPortal,
     InternshalaPortal,
-    FreshersworldPortal,
-    WellfoundPortal,
+    NaukriPortal,
 )
 
 _GMAIL = os.getenv("GMAIL_ADDRESS", "")
 
 PORTALS = [
+    ("naukri",        NaukriPortal,        _GMAIL, os.getenv("NAUKRI_PASSWORD",        "")),
     ("foundit",       FounditPortal,       _GMAIL, os.getenv("FOUNDIT_PASSWORD",       "")),
     ("indeed",        IndeedPortal,        _GMAIL, os.getenv("INDEED_PASSWORD",        "")),
     ("internshala",   InternshalaPortal,   _GMAIL, os.getenv("INTERNSHALA_PASSWORD",   "")),
-    ("cutshort",      CutshortPortal,      _GMAIL, os.getenv("CUTSHORT_PASSWORD",      "")),
-    ("freshersworld", FreshersworldPortal, _GMAIL, os.getenv("FRESHERSWORLD_PASSWORD", "")),
-    ("wellfound",     WellfoundPortal,     _GMAIL, os.getenv("WELLFOUND_PASSWORD",     "")),
 ]
 
 
