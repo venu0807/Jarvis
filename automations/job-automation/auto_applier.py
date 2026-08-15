@@ -474,4 +474,4 @@ async def check_and_alert_zero_applies(summary: dict):
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main())# Demo change for workflow demonstration - Sat, Aug 15, 2026 04:49:56 PM
