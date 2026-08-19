@@ -129,6 +129,95 @@ services:
       retries: 3
       start_period: 10s
 
+  # Staging profile services (run with: docker compose --profile staging up -d)
+  job-automation-staging:
+    profiles: ["staging"]
+    build:
+      context: ./automations/job-automation
+      dockerfile: Dockerfile
+    image: jarvis/job-automation:staging
+    container_name: jarvis-job-automation-staging
+    environment:
+      - DATABASE_URL=postgresql://jarvis:***@postgres:5432/jarvis
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - MODEL_ROUTER_URL=http://model-router-staging:8090
+      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-dev-key-change-in-production}
+      - ENABLE_MODEL_ROUTER=true
+      - HEADLESS=true
+    volumes:
+      - jarvis-secrets:/home/app/.jarvis/.secrets:ro
+      - job-automation-staging-sessions:/app/.sessions
+      - job-automation-staging-output:/app/output
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  pinterest-staging:
+    profiles: ["staging"]
+    build:
+      context: ./automations/pinterest
+      dockerfile: Dockerfile
+    image: jarvis/pinterest:staging
+    container_name: jarvis-pinterest-staging
+    environment:
+      - DATABASE_URL=postgresql://jarvis:***@postgres:5432/jarvis
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - MODEL_ROUTER_URL=http://model-router-staging:8090
+      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-dev-key-change-in-production}
+      - ENABLE_MODEL_ROUTER=true
+      - HEADLESS=true
+    volumes:
+      - jarvis-secrets:/home/app/.jarvis/.secrets:ro
+      - pinterest-staging-output:/app/output
+      - pinterest-staging-logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  model-router-staging:
+    profiles: ["staging"]
+    build:
+      context: ./automations/model-router
+      dockerfile: Dockerfile
+    image: jarvis/model-router:staging
+    container_name: jarvis-model-router-staging
+    environment:
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-dev-key-change-in-production}
+      - ROUTER_PORT=8090
+    ports:
+      - "8091:8090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
 networks:
   jarvis-network:
     driver: bridge
@@ -145,3 +234,7 @@ volumes:
   job-automation-output:
   pinterest-output:
   pinterest-logs:
+  job-automation-staging-sessions:
+  job-automation-staging-output:
+  pinterest-staging-output:
+  pinterest-staging-logs:

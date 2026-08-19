@@ -43,6 +43,9 @@ load_dotenv(Path(__file__).parent / ".env")
 DAILY_LIMIT = int(os.getenv("DAILY_LIMIT", "20"))   # max applies per portal
 HEADLESS    = os.getenv("HEADLESS", "false").lower() == "true"
 
+# Concurrency control: max 2 portals running simultaneously to limit browser contexts
+PORTAL_SEMAPHORE = asyncio.Semaphore(int(os.getenv("MAX_CONCURRENT_PORTALS", "2")))
+
 ROLES = [
     "Python Developer",
     "Django Developer",
@@ -324,23 +327,29 @@ async def main():
     needs_relogin: list = []
 
     async def _run_single_portal(name: str, cls, browser_mgr: AsyncBrowser) -> tuple[str, list, bool]:
-        """Run one portal and return (name, results, session_ok)."""
-        session_file = SESSION_DIR / f"{name}.json"
-        if session_file.exists():
-            print(f"\n💾 {name}: loading saved session from {session_file.name}")
-        context = await browser_mgr.new_context_with_session(session_file)
-        try:
-            results, session_ok = await run_portal(name, cls, context)
-            await browser_mgr.save_session(context, session_file)
-            return name, results, session_ok
-        except Exception as e:
-            print(f"\n❌ {name} portal crashed: {e}")
-            traceback.print_exc()
-            return name, [], False
-        finally:
-            await safe_close_async(context)
+            """Run one portal and return (name, results, session_ok)."""
+            # Use semaphore to limit concurrent portals
+            async with PORTAL_SEMAPHORE:
+                return await _run_single_portal_impl(name, cls, browser_mgr)
 
-    async with AsyncBrowser(headless=is_headless) as browser_mgr:
+        async def _run_single_portal_impl(name: str, cls, browser_mgr: AsyncBrowser) -> tuple[str, list, bool]:
+            """Implementation of single portal run (without semaphore)."""
+            session_file = SESSION_DIR / f"{name}.json"
+            if session_file.exists():
+                print(f"\n💾 {name}: loading saved session from {session_file.name}")
+            context = await browser_mgr.new_context_with_session(session_file)
+            try:
+                results, session_ok = await run_portal(name, cls, context)
+                await browser_mgr.save_session(context, session_file)
+                return name, results, session_ok
+            except Exception as e:
+                print(f"\n❌ {name} portal crashed: {e}")
+                traceback.print_exc()
+                return name, [], False
+            finally:
+                await safe_close_async(context)
+
+        async with AsyncBrowser(headless=is_headless) as browser_mgr:
         # Run all portals in parallel using asyncio.gather
         tasks = [
             _run_single_portal(name, cls, browser_mgr)
