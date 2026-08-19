@@ -39,7 +39,8 @@ class AlertManager:
             "channels": {
                 "email": {"enabled": False, "smtp_server": "", "smtp_port": 587,
                          "username": "", "password": "", "from_addr": "", "to_addrs": []},
-                "webhook": {"enabled": False, "url": "", "headers": {}}
+                "webhook": {"enabled": False, "url": "", "headers": {}},
+                "ntfy": {"enabled": False, "topic": "", "server": "https://ntfy.sh", "priority": "default", "tags": []}
             }
         }
 
@@ -173,6 +174,9 @@ class AlertManager:
                 elif channel == "webhook":
                     if self._send_webhook(title, message, severity):
                         success = True
+                elif channel == "ntfy":
+                    if self._send_ntfy(title, message, severity):
+                        success = True
             except Exception as e:
                 logger.error(f"Failed to send alert via {channel}: {e}")
 
@@ -247,6 +251,48 @@ This is an automated message from JARVIS Job Automation System.
             return True
         except Exception as e:
             logger.error(f"Webhook alert failed: {e}")
+            return False
+
+    def _send_ntfy(self, title: str, message: str, severity: str) -> bool:
+        """Send alert via ntfy.sh"""
+        config = self.config["channels"]["ntfy"]
+        if not config.get("enabled"):
+            return False
+        
+        topic = config.get("topic", "jarvis-alerts")
+        server = config.get("server", "https://ntfy.sh")
+        priority = config.get("priority", "default")
+        tags = config.get("tags", [])
+        
+        # Set priority based on severity
+        priority_map = {"info": "default", "warning": "high", "critical": "urgent"}
+        priority = priority_map.get(severity, priority)
+        
+        # Build tags
+        alert_tags = tags + [severity, "jarvis"]
+        
+        headers = {
+            "Title": title,
+            "Priority": priority,
+            "Tags": ",".join(alert_tags),
+        }
+        
+        # Add deep link action
+        alert_id = hashlib.md5(f"{title}{message}".encode()).hexdigest()[:8]
+        deep_link = f"jarvis://alert/{alert_id}"
+        headers["Actions"] = f'view,{deep_link},View Details'
+        
+        try:
+            resp = requests.post(
+                f"{server}/{topic}",
+                data=message,
+                headers=headers,
+                timeout=10
+            )
+            resp.raise_for_status()
+            return True
+        except Exception as e:
+            logger.error(f"ntfy.sh alert failed: {e}")
             return False
 
 
