@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly Monday 6 AM
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+      - name: Run ruff
+        run: |
+          ruff check automations/
+          ruff format --check automations/
+      - name: Check shell scripts
+        run: |
+          shellcheck jarvis_scheduler.sh || true
+          shellcheck automations/jarvis_boot.sh || true
+          shellcheck automations/jarvis_stop.sh || true
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: jarvis_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U test -d jarvis_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client libpq-dev
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-cov ruff psycopg2-binary python-dotenv
+          pip install playwright
+          playwright install --with-deps chromium
+      - name: Set up environment
+        run: |
+          mkdir -p ~/.jarvis/.secrets
+          echo "DATABASE_URL=postgresql://test:test@localhost:5432/jarvis_test" > ~/.jarvis/.secrets/.env
+          echo "OLLAMA_HOST=http://localhost:11434" >> ~/.jarvis/.secrets/.env
+          echo "OLLAMA_MODEL=phi4-mini:latest" >> ~/.jarvis/.secrets/.env
+      - name: Initialize test database
+        run: |
+          PGPASSWORD=test psql -h localhost -U test -d jarvis_test -c "CREATE EXTENSION IF NOT EXISTS uuid-ossp;"
+      - name: Run tests
+        run: |
+          cd /home/runner/work/Jarvis/Jarvis
+          python -m pytest automations/tests/ -v --tb=short --cov=automations --cov-report=xml
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ""
+          head: HEAD
+          extra_args: --fail --json
+
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [lint, test, secret-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        automation:
+          - job-automation
+          - pinterest
+          - linkedin-outreach
+          - ghost-networker
+          - inbox-monitor
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build image
+        run: |
+          cd automations/${{ matrix.automation }}
+          docker build -t jarvis/${{ matrix.automation }}:${{ github.sha }} .
+      - name: Test image runs
+        run: |
+          docker run --rm jarvis/${{ matrix.automation }}:${{ github.sha }} python -c "import sys; print('Image OK')"
+
+  notify:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [lint, test, secret-scan, build]
+    if: failure()
+    steps:
+      - name: Send failure notification
+        run: |
+          echo "CI pipeline failed for ${{ github.repository }}@${{ github.sha }}"
+          echo "Check: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        shell: bash

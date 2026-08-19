@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: jarvis-postgres
+    environment:
+      POSTGRES_DB: jarvis
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: ${JARVIS_DB_PASS:-jarvis}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jarvis-network
+
+  job-automation:
+    build:
+      context: ./automations/job-automation
+      dockerfile: Dockerfile
+    image: jarvis/job-automation:latest
+    container_name: jarvis-job-automation
+    environment:
+      - DATABASE_URL=postgresql://jarvis:***@postgres:5432/jarvis
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - MODEL_ROUTER_URL=http://model-router:8090
+      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-dev-key-change-in-production}
+      - ENABLE_MODEL_ROUTER=true
+      - HEADLESS=true
+    volumes:
+      - jarvis-secrets:/home/app/.jarvis/.secrets:ro
+      - job-automation-sessions:/app/.sessions
+      - job-automation-output:/app/output
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  pinterest:
+    build:
+      context: ./automations/pinterest
+      dockerfile: Dockerfile
+    image: jarvis/pinterest:latest
+    container_name: jarvis-pinterest
+    environment:
+      - DATABASE_URL=postgresql://jarvis:***@postgres:5432/jarvis
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - MODEL_ROUTER_URL=http://model-router:8090
+      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-dev-key-change-in-production}
+      - ENABLE_MODEL_ROUTER=true
+      - HEADLESS=true
+    volumes:
+      - jarvis-secrets:/home/app/.jarvis/.secrets:ro
+      - pinterest-output:/app/output
+      - pinterest-logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  model-router:
+    build:
+      context: ./automations/model-router
+      dockerfile: Dockerfile
+    image: jarvis/model-router:latest
+    container_name: jarvis-model-router
+    environment:
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-dev-key-change-in-production}
+      - ROUTER_PORT=8090
+    ports:
+      - "8090:8090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # GPU Metrics Exporter - uses official NVIDIA container
+  gpu-exporter:
+    image: nvidia/gpu-exporter:latest
+    container_name: jarvis-gpu-exporter
+    pid: host
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - /:/host:ro,rslave
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    ports:
+      - "9400:9400"
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9400/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  jarvis-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  jarvis-secrets:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${HOME}/.jarvis/.secrets
+      o: bind
+  job-automation-sessions:
+  job-automation-output:
+  pinterest-output:
+  pinterest-logs:

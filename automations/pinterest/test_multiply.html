@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,600&family=Inter:wght@400;600&display=swap');
+  
+  body {
+    margin: 0;
+    padding: 0;
+    width: 1000px;
+    height: 1500px;
+    background-image: url('file:///mnt/c/Users/Venu/.gemini/antigravity-ide/brain/4b852682-1a1a-435a-b1ed-d025b90d2ffe/bg_moody_ambient_room_1783074169490.png');
+    background-size: cover;
+    background-position: center;
+    font-family: 'Inter', sans-serif;
+    position: relative;
+  }
+  
+  .overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.6) 100%);
+    z-index: 1;
+  }
+  
+  .content {
+    z-index: 2;
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Make the product image blend directly into the background! */
+  .product-image {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 800px;
+    max-height: 800px;
+    object-fit: contain;
+    mix-blend-mode: multiply; /* Removes white background seamlessly */
+    filter: drop-shadow(0 20px 30px rgba(0,0,0,0.3)); /* Adds depth */
+  }
+
+  /* Typography overlay matching the user's reference */
+  .title {
+    position: absolute;
+    top: 80px;
+    left: 80px;
+    right: 80px;
+    font-family: 'Playfair Display', serif;
+    font-size: 80px;
+    font-weight: 600;
+    color: white;
+    line-height: 1.1;
+    text-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+
+  .badge {
+    position: absolute;
+    bottom: 100px;
+    left: 80px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    padding: 20px 40px;
+    border-radius: 60px;
+    font-size: 40px;
+    font-weight: bold;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+</style>
+</head>
+<body>
+  <div class="overlay"></div>
+  <div class="content">
+    <div class="title">Glow Up Your Space<br><span style="font-size:40px; font-weight:400; font-family:'Inter'">Minimal light. Maximum focus.</span></div>
+    <img class="product-image" src="file:///mnt/c/Users/Venu/.gemini/antigravity-ide/brain/4b852682-1a1a-435a-b1ed-d025b90d2ffe/test_amazon_img.jpg" />
+    <div class="badge">Only $29.99</div>
+  </div>
+</body>
+</html>

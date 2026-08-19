@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+  
+  body {
+    margin: 0; padding: 0;
+    width: 1000px; height: 1500px;
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    color: #111;
+  }
+  
+  .left, .right {
+    flex: 1;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    box-sizing: border-box;
+  }
+
+  .left {
+    background-image: url('{lifestyle_image_url}');
+    background-size: cover;
+    background-position: center;
+  }
+  
+  .left::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255,255,255,0.7);
+  }
+
+  .right {
+    background: #F9F9F9;
+  }
+
+  .content {
+    z-index: 2;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .badge {
+    background: #111; color: #FFF;
+    padding: 10px 20px; border-radius: 5px;
+    font-weight: 900; font-size: 24px;
+    text-transform: uppercase; letter-spacing: 2px;
+    margin-bottom: 40px;
+  }
+  
+  .badge.dupe {
+    background: #FF6B6B;
+  }
+
+  img {
+    width: 350px; height: 350px;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+    margin-bottom: 40px;
+  }
+
+  .price {
+    font-size: 80px; font-weight: 900; margin-bottom: 10px;
+  }
+  .old-price {
+    text-decoration: line-through; color: #888; font-size: 40px;
+  }
+  
+  .title-text {
+    font-size: 32px; font-weight: 700; margin-bottom: 20px;
+  }
+
+  .vs {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: #111; color: #FFF;
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; font-weight: 900; z-index: 10;
+    border: 10px solid #FFF;
+  }
+</style>
+</head>
+<body>
+  <div class="left">
+    <div class="content">
+      <div class="badge">Designer Brand</div>
+      <img src="{product_image_url}" style="filter: grayscale(100%); opacity: 0.5;" />
+      <div class="price">$500</div>
+      <div class="title-text">Way Too Expensive</div>
+    </div>
+  </div>
+  
+  <div class="vs">VS</div>
+  
+  <div class="right">
+    <div class="content">
+      <div class="badge dupe">Amazon Find</div>
+      <img src="{product_image_url}" />
+      <div class="price">{price}</div>
+      <div class="title-text">Exact Same Vibe!</div>
+      <div style="background: #FF6B6B; color: white; padding: 15px 40px; border-radius: 40px; font-size: 24px; font-weight: 700; margin-top: 30px;">LINK IN BIO</div>
+    </div>
+  </div>
+</body>
+</html>

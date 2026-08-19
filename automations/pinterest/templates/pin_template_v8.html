@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;700&display=swap');
+  
+  body {
+    margin: 0; padding: 0; width: 1000px; height: 1500px;
+    background-image: url('{lifestyle_image_url}');
+    background-size: cover; background-position: center;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  .overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 100%); z-index: 1;
+  }
+  
+  .content {
+    z-index: 2; position: relative; padding: 80px; box-sizing: border-box; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; color: white;
+  }
+  
+  .stars {
+    color: #FFD700; font-size: 60px; letter-spacing: 10px; margin-bottom: 30px; text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  }
+  
+  .quote {
+    font-family: 'Playfair Display', serif; font-size: 70px; line-height: 1.2; margin-bottom: 40px;
+  }
+  
+  .social-proof {
+    background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); padding: 20px 30px; border-radius: 20px;
+    display: inline-block; font-size: 24px; font-weight: 700; margin-bottom: 60px; border: 1px solid rgba(255,255,255,0.3);
+  }
+  
+  .product-box {
+    background: white; border-radius: 30px; padding: 30px; display: flex; align-items: center; color: black;
+  }
+  
+  .product-box img { width: 150px; height: 150px; object-fit: contain; margin-right: 30px; }
+  
+  .info { flex: 1; }
+  .title { font-size: 28px; font-weight: 700; margin-bottom: 10px; }
+  .price { font-size: 40px; font-weight: 900; color: #FF6B6B; }
+  .btn { background: #111; color: white; padding: 15px 30px; border-radius: 30px; font-size: 20px; font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="overlay"></div>
+  <div class="content">
+    <div class="stars">★★★★★</div>
+    <div class="quote">"Literally the best thing I've bought on Amazon all year. The hype is real."</div>
+    <div><div class="social-proof">🔥 Over 10,000 bought in the last month</div></div>
+    
+    <div class="product-box">
+      <img src="{product_image_url}">
+      <div class="info">
+        <div class="title">{title}</div>
+        <div class="price">{price}</div>
+      </div>
+      <div class="btn">Shop Now</div>
+    </div>
+  </div>
+</body>
+</html>
