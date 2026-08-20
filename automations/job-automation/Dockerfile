@@ -14,5 +14,9 @@ RUN mkdir -p .sessions output/logs
 # Make run.py executable
 RUN chmod +x run.py
 
+# Copy entrypoint wrapper
+COPY automations/job-automation/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Default command
-CMD ["python", "run.py"]
+ENTRYPOINT ["/entrypoint.sh"]

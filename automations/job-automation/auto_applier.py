@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 auto_applier.py — Job application orchestrator
 Flow: login all portals ONCE → search jobs → auto-apply → collect manual/skipped
@@ -12,6 +13,7 @@ import os
 import sys
 import traceback
 from pathlib import Path
+from typing import Union, Optional
 
 # Configure UTF-8 encoding for standard output and error to avoid UnicodeEncodeError on Windows
 if sys.stdout.encoding != 'utf-8':
@@ -185,7 +187,7 @@ async def run_portal(portal_name: str, portal_cls, context) -> tuple[list, bool]
 
 # ── Summary builder ───────────────────────────────────────────────────────────
 
-def build_summary(all_results: list, needs_relogin: list | None = None) -> dict:
+def build_summary(all_results: list, needs_relogin: Optional[list] = None) -> dict:
     applied  = [r for r in all_results if r.status == "applied"]
     manual   = [r for r in all_results if r.status == "manual"]
     skipped  = [r for r in all_results if r.status == "skipped"]
@@ -284,10 +286,36 @@ def _acquire_run_lock() -> bool:
         return True
 
 
+async def _run_single_portal_impl(name: str, cls, browser_mgr: AsyncBrowser) -> tuple[str, list, bool]:
+    """Implementation of single portal run (without semaphore)."""
+    session_file = SESSION_DIR / f"{name}.json"
+    if session_file.exists():
+        print(f"\n💾 {name}: loading saved session from {session_file.name}")
+    context = await browser_mgr.new_context_with_session(session_file)
+    try:
+        results, session_ok = await run_portal(name, cls, context)
+        await browser_mgr.save_session(context, session_file)
+        return name, results, session_ok
+    except Exception as e:
+        print(f"\n❌ {name} portal crashed: {e}")
+        traceback.print_exc()
+        return name, [], False
+    finally:
+        await safe_close_async(context)
+
+
+async def _run_single_portal(name: str, cls, browser_mgr: AsyncBrowser) -> tuple[str, list, bool]:
+    """Run one portal and return (name, results, session_ok)."""
+    # Use semaphore to limit concurrent portals
+    async with PORTAL_SEMAPHORE:
+        return await _run_single_portal_impl(name, cls, browser_mgr)
+
+
 async def main():
     if not _acquire_run_lock():
         return
 
+    # Parse arguments inside main() to avoid module-level execution on import
     parser = argparse.ArgumentParser(description="Auto-apply to jobs across portals")
     parser.add_argument("--portal", choices=["naukri", "internshala", "indeed", "foundit"], help="Run only one portal")
     parser.add_argument("--headful", action="store_true", help="Run with visible browser (overrides HEADLESS)")
@@ -299,16 +327,16 @@ async def main():
     is_headless = HEADLESS
     if args.headful:
         is_headless = False
-        
+
     mode_str = "headless" if is_headless else "visible browser"
     print(f"""
-╔══════════════════════════════════════════════════════════════════════════════════╗
+╔═══════════════════════════════════════════════════════════════════════════════════╗
 ║   🦞 OpenClaw Auto-Apply Engine                 ║
 ║   Venu Gopal Reddy                               ║
 ║   Date:  {today}                                 ║
 ║   Limit: {DAILY_LIMIT}/portal/day                ║
 ║   Mode:  {mode_str}                              ║
-╚═════════════════════════════════════════════════════════════════════════════════╝
+╚══════════════════════════════════════════════════════════════════════════════════╝
 """)
 
     portal_map = {
@@ -327,29 +355,12 @@ async def main():
     needs_relogin: list = []
 
     async def _run_single_portal(name: str, cls, browser_mgr: AsyncBrowser) -> tuple[str, list, bool]:
-            """Run one portal and return (name, results, session_ok)."""
-            # Use semaphore to limit concurrent portals
-            async with PORTAL_SEMAPHORE:
-                return await _run_single_portal_impl(name, cls, browser_mgr)
+        """Run one portal and return (name, results, session_ok)."""
+        # Use semaphore to limit concurrent portals
+        async with PORTAL_SEMAPHORE:
+            return await _run_single_portal_impl(name, cls, browser_mgr)
 
-        async def _run_single_portal_impl(name: str, cls, browser_mgr: AsyncBrowser) -> tuple[str, list, bool]:
-            """Implementation of single portal run (without semaphore)."""
-            session_file = SESSION_DIR / f"{name}.json"
-            if session_file.exists():
-                print(f"\n💾 {name}: loading saved session from {session_file.name}")
-            context = await browser_mgr.new_context_with_session(session_file)
-            try:
-                results, session_ok = await run_portal(name, cls, context)
-                await browser_mgr.save_session(context, session_file)
-                return name, results, session_ok
-            except Exception as e:
-                print(f"\n❌ {name} portal crashed: {e}")
-                traceback.print_exc()
-                return name, [], False
-            finally:
-                await safe_close_async(context)
-
-        async with AsyncBrowser(headless=is_headless) as browser_mgr:
+    async with AsyncBrowser(headless=is_headless) as browser_mgr:
         # Run all portals in parallel using asyncio.gather
         tasks = [
             _run_single_portal(name, cls, browser_mgr)
@@ -419,12 +430,12 @@ async def main():
 
     t = summary["totals"]
     print(f"""
-╔═══════════════════════════════════════════════════════════════════════════════════════╗
+╔═══════════════════════════════════════════════════════════════════════════════════════════╗
 ║   ✅ Auto-Apply Complete!                        ║
 ║   Auto-applied:   {str(t['applied']).ljust(5)} jobs                  ║
 ║   Apply manually: {str(t['manual_total']).ljust(5)} jobs (links in email)   ║
 ║   Errors:         {str(t['errors']).ljust(5)}                        ║
-╚═══════════════════════════════════════════════════════════════════════════════════╝
+╚═════════════════════════════════════════════════════════════════════════════════════╝
 """)
 
     # Print per-portal stats
@@ -445,7 +456,7 @@ async def check_and_alert_zero_applies(summary: dict):
     applied_count = summary["totals"].get("applied", 0)
     manual_count = summary["totals"].get("manual_total", 0)
     total_actionable = applied_count + manual_count
-    
+
     # Load tracker
     tracker = {"consecutive_zero": 0, "last_date": None}
     if ZERO_APPLY_TRACKER.exists():
@@ -453,9 +464,9 @@ async def check_and_alert_zero_applies(summary: dict):
             tracker = json.loads(ZERO_APPLY_TRACKER.read_text())
         except:
             pass
-    
+
     today = summary["date"]
-    
+
     if total_actionable == 0:
         if tracker["last_date"] == today:
             # Already counted today
@@ -466,11 +477,11 @@ async def check_and_alert_zero_applies(summary: dict):
     else:
         tracker["consecutive_zero"] = 0
         tracker["last_date"] = today
-    
+
     # Save tracker
     ZERO_APPLY_TRACKER.parent.mkdir(parents=True, exist_ok=True)
     ZERO_APPLY_TRACKER.write_text(json.dumps(tracker, indent=2))
-    
+
     # Alert if 2+ consecutive zero-apply runs
     if tracker["consecutive_zero"] >= 2:
         alert_warning(

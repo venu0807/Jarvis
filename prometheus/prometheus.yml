@@ -1,0 +1,41 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: jarvis-local
+    monitor: jarvis
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # JARVIS automations — each exposes /metrics on its service port
+  - job_name: job-automation
+    static_configs:
+      - targets: ['job-automation:8000']
+    metrics_path: /metrics
+
+  - job_name: pinterest
+    static_configs:
+      - targets: ['pinterest:8000']
+    metrics_path: /metrics
+
+  - job_name: model-router
+    static_configs:
+      - targets: ['model-router:8000']
+    metrics_path: /metrics
+
+  - job_name: postgres
+    static_configs:
+      - targets: ['postgres:5432']
+    metrics_path: /metrics
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']

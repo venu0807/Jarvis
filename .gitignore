@@ -122,35 +122,32 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# Jarvis specific
+# JARVIS specific
 logs/
 audio_cache/
 image_cache/
 pexels_cache/
 attributions/
-canary/
 cache/
-desktop/
-desktop-plugins/
-hooks/
-image_cache/
-lsp/
-memories/
-node/
-sandboxes/
-sessions/
-skills/
-models_dev_cache.json
-provider_models_cache.json
-state.db
-state.db-shm
-state.db-wal
-verification_evidence.db
-kanb2.db
-kanb2.db.init.lock
-projects.db
-auth.json
-auth.lock
-.launch-hermes.vbs
-SOUL.md
-.update_check
+playwright_profile/
+screenshots/*.tmp
+*.db-shm
+*.db-wal
+# Local Docker volumes
+postgres_data/
+grafana_data/
+prometheus_data/
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+# Test artifacts
+.coverage
+htmlcov/
+.pytest_cache/
+*.log
+# Build artifacts
+dist/
+build/
+*.egg-info/

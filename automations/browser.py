@@ -19,7 +19,7 @@ Usage:
 
 import asyncio
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
 # Shared constants
@@ -39,7 +39,7 @@ class BrowserConfig:
         self.headless = headless
         self.slow_mo = slow_mo
 
-def build_context_kwargs(config: BrowserConfig, session_file: Optional[Path | str] = None, **extra) -> Dict[str, Any]:
+def build_context_kwargs(config: BrowserConfig, session_file: Optional[Union[Path, str]] = None, **extra) -> Dict[str, Any]:
     """
     Build keyword arguments for browser.new_context or new_context_with_session.
     If session_file is provided, the caller should pass it to new_context_with_session
@@ -120,7 +120,7 @@ class AsyncBrowser:
         self._contexts.append(context)
         return context
 
-    async def new_context_with_session(self, session_file: Path | str, **kwargs) -> BrowserContext:
+    async def new_context_with_session(self, session_file: Union[Path, str], **kwargs) -> BrowserContext:
         """Create a new context, loading storage_state from session_file if it exists."""
         session_path = Path(session_file)
         if session_path.exists():
@@ -128,7 +128,7 @@ class AsyncBrowser:
             print(f"  💾 Loading session from {session_path.name}")
         return await self.new_context(**kwargs)
 
-    async def save_session(self, context: BrowserContext, session_file: Path | str):
+    async def save_session(self, context: BrowserContext, session_file: Union[Path, str]):
         """Save context storage_state to session_file."""
         session_path = Path(session_file)
         session_path.parent.mkdir(parents=True, exist_ok=True)
@@ -169,13 +169,13 @@ class SyncBrowser:
         defaults.update(kwargs)
         return self._browser.new_context(**defaults)
 
-    def new_context_with_session(self, session_file: Path | str, **kwargs):
+    def new_context_with_session(self, session_file: Union[Path, str], **kwargs):
         session_path = Path(session_file)
         if session_path.exists():
             kwargs.setdefault("storage_state", str(session_path))
         return self.new_context(**kwargs)
 
-    def save_session(self, context, session_file: Path | str):
+    def save_session(self, context, session_file: Union[Path, str]):
         session_path = Path(session_file)
         session_path.parent.mkdir(parents=True, exist_ok=True)
         context.storage_state(path=str(session_path))

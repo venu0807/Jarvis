@@ -3,7 +3,7 @@ from sqlalchemy import create_engine, text
 import os
 
 # Database connection - use DATABASE_URL from environment or fallback to container name
-DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://jarvis:jarvis@jarvis-postgres:5432/jarvis')
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://jarvis:***@jarvis-postgres:5432/jarvis')
 ENGINE = create_engine(DATABASE_URL)
 
 # CSV file path for fallback

@@ -1,13 +1,12 @@
 import os
 import re
-from google import genai
-from google.genai import types
+from google.genai import Client, types
 
 def get_client():
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         return None
-    return genai.Client(api_key=api_key)
+    return Client(api_key=api_key)
 
 def generate_seo_title(name: str, category: str, is_trending: bool = False, price: str = None) -> str:
     """Generates an SEO optimized Pinterest title using Gemini."""

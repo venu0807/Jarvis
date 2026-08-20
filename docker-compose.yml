@@ -1,6 +1,9 @@
 version: '3.8'
 
 services:
+  # ============================================================
+  # Database
+  # ============================================================
   postgres:
     image: postgres:16-alpine
     container_name: jarvis-postgres
@@ -21,202 +24,137 @@ services:
     networks:
       - jarvis-network
 
+  # ============================================================
+  # Automations
+  # ============================================================
   job-automation:
     build:
       context: ./automations/job-automation
       dockerfile: Dockerfile
-    image: jarvis/job-automation:latest
-    container_name: jarvis-job-automation
+    container_name: jarvis-job-auto
+    env_file: ./automations/job-automation/.env
     environment:
-      - DATABASE_URL=postgresql://jarvis:***@postgres:5432/jarvis
+      - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS:-jarvis}@postgres:5432/jarvis
       - OLLAMA_HOST=http://host.docker.internal:11434
-      - MODEL_ROUTER_URL=http://model-router:8090
-      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-dev-key-change-in-production}
-      - ENABLE_MODEL_ROUTER=true
-      - HEADLESS=true
-    volumes:
-      - jarvis-secrets:/home/app/.jarvis/.secrets:ro
-      - job-automation-sessions:/app/.sessions
-      - job-automation-output:/app/output
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - "8001:8000"
     networks:
       - jarvis-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   pinterest:
     build:
       context: ./automations/pinterest
       dockerfile: Dockerfile
-    image: jarvis/pinterest:latest
     container_name: jarvis-pinterest
+    env_file: ./automations/pinterest/.env
     environment:
-      - DATABASE_URL=postgresql://jarvis:***@postgres:5432/jarvis
+      - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS:-jarvis}@postgres:5432/jarvis
       - OLLAMA_HOST=http://host.docker.internal:11434
-      - MODEL_ROUTER_URL=http://model-router:8090
-      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-dev-key-change-in-production}
-      - ENABLE_MODEL_ROUTER=true
-      - HEADLESS=true
-    volumes:
-      - jarvis-secrets:/home/app/.jarvis/.secrets:ro
-      - pinterest-output:/app/output
-      - pinterest-logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - "8002:8000"
     networks:
       - jarvis-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   model-router:
     build:
       context: ./automations/model-router
       dockerfile: Dockerfile
-    image: jarvis/model-router:latest
     container_name: jarvis-model-router
     environment:
-      - OLLAMA_URL=http://host.docker.internal:11434
-      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-dev-key-change-in-production}
-      - ROUTER_PORT=8090
-    ports:
-      - "8090:8090"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - jarvis-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-
-  # GPU Metrics Exporter - uses official NVIDIA container
-  gpu-exporter:
-    image: nvidia/gpu-exporter:latest
-    container_name: jarvis-gpu-exporter
-    pid: host
-    cap_add:
-      - SYS_ADMIN
-    volumes:
-      - /:/host:ro,rslave
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-    ports:
-      - "9400:9400"
-    networks:
-      - jarvis-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9400/metrics"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-
-  # Staging profile services (run with: docker compose --profile staging up -d)
-  job-automation-staging:
-    profiles: ["staging"]
-    build:
-      context: ./automations/job-automation
-      dockerfile: Dockerfile
-    image: jarvis/job-automation:staging
-    container_name: jarvis-job-automation-staging
-    environment:
-      - DATABASE_URL=postgresql://jarvis:***@postgres:5432/jarvis
+      - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS:-jarvis}@postgres:5432/jarvis
       - OLLAMA_HOST=http://host.docker.internal:11434
-      - MODEL_ROUTER_URL=http://model-router-staging:8090
-      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-dev-key-change-in-production}
-      - ENABLE_MODEL_ROUTER=true
-      - HEADLESS=true
-    volumes:
-      - jarvis-secrets:/home/app/.jarvis/.secrets:ro
-      - job-automation-staging-sessions:/app/.sessions
-      - job-automation-staging-output:/app/output
+      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-changeme}
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - jarvis-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  pinterest-staging:
-    profiles: ["staging"]
-    build:
-      context: ./automations/pinterest
-      dockerfile: Dockerfile
-    image: jarvis/pinterest:staging
-    container_name: jarvis-pinterest-staging
-    environment:
-      - DATABASE_URL=postgresql://jarvis:***@postgres:5432/jarvis
-      - OLLAMA_HOST=http://host.docker.internal:11434
-      - MODEL_ROUTER_URL=http://model-router-staging:8090
-      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-dev-key-change-in-production}
-      - ENABLE_MODEL_ROUTER=true
-      - HEADLESS=true
-    volumes:
-      - jarvis-secrets:/home/app/.jarvis/.secrets:ro
-      - pinterest-staging-output:/app/output
-      - pinterest-staging-logs:/app/logs
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - jarvis-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  model-router-staging:
-    profiles: ["staging"]
-    build:
-      context: ./automations/model-router
-      dockerfile: Dockerfile
-    image: jarvis/model-router:staging
-    container_name: jarvis-model-router-staging
-    environment:
-      - OLLAMA_URL=http://host.docker.internal:11434
-      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-dev-key-change-in-production}
-      - ROUTER_PORT=8090
     ports:
-      - "8091:8090"
-    depends_on:
-      postgres:
-        condition: service_healthy
+      - "8003:8000"
     networks:
       - jarvis-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+
+  # ============================================================
+  # Observability
+  # ============================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: jarvis-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    depends_on:
+      - job-automation
+      - pinterest
+      - model-router
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: jarvis-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASS:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: jarvis-alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # ============================================================
+  # Dashboard (when present)
+  # ============================================================
+  dashboard:
+    profiles: ["with-dashboard"]  # opt-in via: docker compose --profile with-dashboard up
+    build:
+      context: ./automations/dashboard-nextjs
+      dockerfile: Dockerfile
+    container_name: jarvis-dashboard
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8003
+    ports:
+      - "3000:3000"
+    depends_on:
+      - model-router
+    networks:
+      - jarvis-network
+    restart: unless-stopped
 
 networks:
   jarvis-network:
@@ -224,17 +162,5 @@ networks:
 
 volumes:
   postgres_data:
-  jarvis-secrets:
-    driver: local
-    driver_opts:
-      type: none
-      device: ${HOME}/.jarvis/.secrets
-      o: bind
-  job-automation-sessions:
-  job-automation-output:
-  pinterest-output:
-  pinterest-logs:
-  job-automation-staging-sessions:
-  job-automation-staging-output:
-  pinterest-staging-output:
-  pinterest-staging-logs:
+  prometheus_data:
+  grafana_data:

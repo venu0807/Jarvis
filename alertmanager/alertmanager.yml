@@ -1,0 +1,44 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
+  receiver: 'default'
+  routes:
+    - matchers:
+        - severity = "critical"
+      receiver: 'critical'
+      repeat_interval: 15m
+
+receivers:
+  - name: 'default'
+    email_configs:
+      - to: ${ALERT_EMAIL:-pvgreddy3@gmail.com}
+        from: ${SMTP_FROM:-jarvis-alerts@gmail.com}
+        smarthost: ${SMTP_SERVER:-smtp.gmail.com}:${SMTP_PORT:-587}
+        auth_username: ${SMTP_USER}
+        auth_password: ${SMTP_PASS}
+        send_resolved: true
+    webhook_configs:
+      - url: ${NTFY_WEBHOOK_URL:-https://ntfy.sh/jarvis-alerts-default-topic}
+        send_resolved: true
+
+  - name: 'critical'
+    email_configs:
+      - to: ${ALERT_EMAIL:-pvgreddy3@gmail.com}
+        from: ${SMTP_FROM:-jarvis-alerts@gmail.com}
+        smarthost: ${SMTP_SERVER:-smtp.gmail.com}:${SMTP_PORT:-587}
+        auth_username: ${SMTP_USER}
+        auth_password: ${SMTP_PASS}
+        send_resolved: true
+    webhook_configs:
+      - url: ${NTFY_WEBHOOK_URL:-https://ntfy.sh/jarvis-alerts-critical}
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers: [severity="critical"]
+    target_matchers: [severity="warning"]
+    equal: [alertname]

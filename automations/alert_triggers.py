@@ -124,7 +124,7 @@ def check_postgres_connection():
         sock.settimeout(5)
         result = sock.connect_ex(('localhost', 5432))
         sock.close()
-        
+
         if result != 0:
             if should_alert("postgres_connection"):
                 send_critical(
@@ -282,12 +282,13 @@ def check_ollama_availability():
                 del last_alerts["ollama_unavailable"]
     except Exception as e:
         if should_alert("ollama_unavailable"):
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             send_warning(
                 title="⚠️ Ollama Unavailable",
                 message=(
                     "Cannot connect to Ollama API.{NL}{NL}"
                     f"Error: {str(e)}{NL}"
-                    f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{NL}{NL}"
+                    f"Time: {timestamp}{NL}{NL}"
                     "This usually means Ollama is not running.{NL}{NL}"
                     "Immediate actions:{NL}"
                     "1. Start Ollama: systemctl --user start ollama{NL}"

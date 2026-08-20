@@ -25,8 +25,25 @@ logger = logging.getLogger(__name__)
 class AlertManager:
     def __init__(self, config_path: str = None):
         # Handle WSL/Windows path differences - use env var with sensible defaults
-        default_path = os.getenv("ALERT_CONFIG_PATH", os.path.expanduser("~/.jarvis/.secrets/alert.env"))
-        self.config_path = config_path or default_path
+        # Try multiple locations for the config file
+        if config_path is None:
+            config_path = os.getenv("ALERT_CONFIG_PATH")
+        if config_path is None:
+            # Try WSL native path first
+            wsl_path = os.path.expanduser("~/.jarvis/.secrets/alert.env")
+            # Try Windows junction path
+            win_path = r"C:\Users\Venu\.jarvis\.secrets\alert.env"
+            # Try WSL mount path
+            mount_path = "/mnt/c/Users/Venu/.jarvis/.secrets/alert.env"
+            
+            for p in [wsl_path, win_path, mount_path]:
+                if Path(p).exists():
+                    config_path = p
+                    break
+            else:
+                config_path = wsl_path  # default fallback
+        
+        self.config_path = config_path
         self.config = self._load_config()
         self.alert_history = self._load_history()
         self.dedup_window = timedelta(minutes=self.config.get("dedup_window_minutes", 60))
@@ -71,7 +88,20 @@ class AlertManager:
 
     def _load_history(self) -> List[Dict]:
         """Load alert history from file"""
-        history_path = os.getenv("ALERT_HISTORY_PATH", os.path.expanduser("~/.jarvis/.alerts_history.json"))
+        history_path = os.getenv("ALERT_HISTORY_PATH")
+        if history_path is None:
+            # Try multiple locations
+            wsl_path = os.path.expanduser("~/.jarvis/.alerts_history.json")
+            win_path = r"C:\Users\Venu\.jarvis\.alerts_history.json"
+            mount_path = "/mnt/c/Users/Venu/.jarvis/.alerts_history.json"
+            
+            for p in [wsl_path, win_path, mount_path]:
+                if Path(p).exists():
+                    history_path = p
+                    break
+            else:
+                history_path = wsl_path
+        
         history_file = Path(history_path)
         if history_file.exists():
             try:
