@@ -160,3 +160,4 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+.zero_apply_tracker.json
