@@ -133,10 +133,17 @@ playwright_profile/
 screenshots/*.tmp
 *.db-shm
 *.db-wal
+# Bot session files (Playwright contexts — contain login state)
+.sessions/
+.sessions/**
+# Hermes temp files
+.hermes-tmp*
 # Local Docker volumes
 postgres_data/
 grafana_data/
 prometheus_data/
+# Auto-applier session tracking
+.zero_apply_tracker.json
 # IDE / OS
 .vscode/
 .idea/
