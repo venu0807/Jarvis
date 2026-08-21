@@ -11,6 +11,8 @@
 
 [**5-Minute Demo**](#-demo) · [**Quick Start**](#-quick-start) · [**Architecture**](#-architecture) · [**Roadmap**](#-roadmap)
 
+> 📝 Read the full story: [I Built 30+ Projects in a Year](https://dev.to/venu0807) — JARVIS is one of 30+ shipped projects across AI/ML, full-stack, and DevOps.
+
 ---
 
 ## 🎯 The Problem
@@ -270,6 +272,33 @@ MIT — see [LICENSE](LICENSE).
 - [Prometheus](https://prometheus.io) + [Grafana](https://grafana.com) — observability
 - [ntfy.sh](https://ntfy.sh) — mobile push notifications
 - The open-source community for the tools that made this possible.
+
+---
+
+## 🚀 More Projects
+
+JARVIS is my flagship, but I've shipped 30+ projects in the last year. Here are the highlights:
+
+### AI / ML (9 projects)
+
+- [**SafeAI**](https://github.com/venu0807/SafeAI) — On-device audio threat detection. CNN, 89% accuracy, sub-100ms inference on Android.
+- [**Recommendation_System**](https://github.com/venu0807/Recommendation_System) — Movie recommender with Django REST Framework + scikit-learn.
+- [**RoastMyCV**](https://github.com/venu0807/roastmycv) — AI resume reviewer (TypeScript).
+- [**AI-Based-University-Query-Assistant**](https://github.com/venu0807/AI-Based-University-Query-Assistant) — RAG chatbot for university queries.
+- [**ai-coding-agent**](https://github.com/venu0807/ai-coding-agent), [**ai-coding-factory**](https://github.com/venu0807/ai-coding-factory) — Agentic AI tools.
+- ANN-Classification-Churn-Prediction · Synthetic-Fraud-AI · Nutrition_Agent
+
+### Full Stack (7+ projects)
+
+- [**briefforge**](https://github.com/venu0807/briefforge) — Content tool.
+- [**website-prospector**](https://github.com/venu0807/website-prospector) — Lead generation.
+- [**picscore**](https://github.com/venu0807/picscore) — Visual scoring.
+- [**affiliate-store**](https://github.com/venu0807/affiliate-store) — E-commerce.
+- finance_backend · DJ · HealthCare · portfolio · portfolio_1
+
+**Languages shipped in**: Python · TypeScript · JavaScript · Java
+
+See the full list: [github.com/venu0807](https://github.com/venu0807?tab=repositories)
 
 ---
 
