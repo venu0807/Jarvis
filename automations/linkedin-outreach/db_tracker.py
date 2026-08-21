@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import csv
 import datetime
+import os
 import sqlite3
 from pathlib import Path
 from typing import Optional
@@ -53,7 +54,9 @@ class SentTracker:
 
     def _init_db(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self._path) as conn:
+        # Use timeout to avoid WinError 32 when file is locked briefly
+        with sqlite3.connect(self._path, timeout=10) as conn:
+            # ── sent_emails table (with new tier + template_id columns) ──
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS sent_emails (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,11 +66,12 @@ class SentTracker:
                     subject TEXT DEFAULT '',
                     sent_at TEXT NOT NULL,
                     is_fallback INTEGER DEFAULT 0,
-                    status TEXT DEFAULT 'sent',
-                    tier TEXT DEFAULT 'T3',
-                    template_id TEXT DEFAULT 'T2'
+                    status TEXT DEFAULT 'sent'
                 )
             """)
+            # Migration: add tier + template_id columns if missing (for v1 DBs)
+            self._migrate_add_column(conn, "sent_emails", "tier", "TEXT DEFAULT 'T3'")
+            self._migrate_add_column(conn, "sent_emails", "template_id", "TEXT DEFAULT 'T2'")
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_sent_recipient
                 ON sent_emails(recipient)
@@ -80,7 +84,7 @@ class SentTracker:
                 CREATE INDEX IF NOT EXISTS idx_sent_tier
                 ON sent_emails(tier)
             """)
-            # ── NEW: replies table ───────────────────────────────────
+            # ── replies table ───────────────────────────────────
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS replies (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,7 +99,7 @@ class SentTracker:
                 CREATE INDEX IF NOT EXISTS idx_replies_recipient
                 ON replies(recipient)
             """)
-            # ── NEW: follow-ups table ────────────────────────────────
+            # ── follow-ups table ────────────────────────────────
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS followups (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,10 +120,26 @@ class SentTracker:
             """)
             conn.commit()
 
+    def _migrate_add_column(self, conn, table: str, column: str, definition: str) -> None:
+        """Add a column to an existing table if it doesn't exist (safe migration)."""
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+            # Only print during actual migrations, not during tests
+            if os.environ.get("JARVIS_TRACKER_VERBOSE") == "1":
+                print(f"  [migration] Added column {table}.{column}")
+        except sqlite3.OperationalError as e:
+            # "duplicate column name" = already exists, that's fine
+            if "duplicate column" not in str(e):
+                raise
+
     # ── Connection helper ────────────────────────────────────────────────
 
     def _conn(self) -> sqlite3.Connection:
-        return sqlite3.connect(self._path)
+        # timeout avoids WinError 32 / "database is locked" on Windows
+        conn = sqlite3.connect(self._path, timeout=10)
+        # Allow concurrent reads, serialize writes
+        conn.execute("PRAGMA journal_mode=WAL")
+        return conn
 
     # ── Dedup check ──────────────────────────────────────────────────────
 

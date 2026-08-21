@@ -201,7 +201,7 @@ AlertManager evaluates rules every 30 seconds. Critical alerts go to email + ntf
 Jarvis/
 ├── automations/              # 25 self-contained automation modules
 │   ├── job-automation/       # Naukri/Internshala/Indeed/Foundit
-│   ├── linkedin-outreach/    # Connection automation
+│   ├── linkedin-outreach/    # Tiered cold-email automation (T1-T5)
 │   ├── pinterest/            # Pin generator + uploader
 │   ├── interview_scheduler_prep_bot/
 │   ├── dashboard-nextjs/     # Web UI
@@ -215,6 +215,56 @@ Jarvis/
 ├── .env.example              # Template for secrets
 └── README.md                 # ← You are here
 ```
+
+---
+
+## 📬 LinkedIn Outreach (`automations/linkedin-outreach/`)
+
+Tiered cold-email bot with **5 email templates** (T1-T5), **reply tracking**, and **auto follow-ups**. Zero-leak LLM routing via `policy.call_llm()`.
+
+### Quick Start
+
+```bash
+cd automations/linkedin-outreach
+python run.py --tier T1 --template T1 --dry-run    # Preview Tier 1 emails
+python run.py --tier T1 --template T1 --limit 5      # Send 5 Tier 1 emails
+python run.py --followups                            # Send Day-5 follow-ups
+python run.py --export                               # CSV for Google Sheets
+```
+
+### Flags
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--tier T1,T2,T3` | All | T1=founders (Sarvam, Yellow.ai, Haptik), T2=hiring managers, T3=recruiters |
+| `--template T1-T5` | T2 | T1=founder DM, T2=HM DM, T3=reply, T4=HR cover letter, T5=follow-up |
+| `--limit N` | 15 | Override daily personal-email cap |
+| `--roles "X,Y"` | 11 roles | Custom role subset (Full Stack AI, AI Engineer, Backend, etc.) |
+| `--dry-run` | off | Scrape + extract only; never send |
+| `--export` | off | Export tracker DB to CSV for Google Sheets |
+| `--followups` | off | Send all due Day-5 follow-ups |
+| `--test-email a@b.com` | — | Send a single test email |
+
+### Database (auto-migrates from v1)
+
+```sql
+sent_emails: recipient, role, company, subject, sent_at, is_fallback, status, tier, template_id
+replies:     recipient, subject, snippet, received_at, sentiment
+followups:   recipient, scheduled_for, template_id, sent_at, status
+```
+
+### Configuration (`.env`)
+
+```bash
+SMTP_USER=pvgreddy3@gmail.com
+SMTP_APP_PASSWORD=your_app_password_here
+RESUME_PATH=/path/to/your/resume.pdf
+DAILY_PERSONAL_CAP=15
+DAILY_FALLBACK_CAP=30
+PER_ROLE_CAP=2
+```
+
+See [`automations/linkedin-outreach/README.md`](automations/linkedin-outreach/README.md) for full docs.
 
 ---
 
