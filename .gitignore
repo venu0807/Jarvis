@@ -144,6 +144,8 @@ grafana_data/
 prometheus_data/
 # Auto-applier session tracking
 .zero_apply_tracker.json
+# Debug screenshots (Naukri headless errors, etc.)
+*naukri_headless_error.png
 # IDE / OS
 .vscode/
 .idea/

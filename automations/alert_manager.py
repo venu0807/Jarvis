@@ -3,6 +3,7 @@
 Supports:
 - Email (SMTP)
 - Webhook (generic HTTP)
+- ntfy.sh (push notifications)
 - Rate limiting & deduplication
 - Severity levels: info, warning, critical
 """
@@ -27,21 +28,28 @@ class AlertManager:
         # Handle WSL/Windows path differences - use env var with sensible defaults
         # Try multiple locations for the config file
         if config_path is None:
-            config_path = os.getenv("ALERT_CONFIG_PATH")
-        if config_path is None:
-            # Try WSL native path first
-            wsl_path = os.path.expanduser("~/.jarvis/.secrets/alert.env")
-            # Try Windows junction path
-            win_path = r"C:\Users\Venu\.jarvis\.secrets\alert.env"
-            # Try WSL mount path
-            mount_path = "/mnt/c/Users/Venu/.jarvis/.secrets/alert.env"
-            
-            for p in [wsl_path, win_path, mount_path]:
-                if Path(p).exists():
-                    config_path = p
-                    break
-            else:
-                config_path = wsl_path  # default fallback
+            # Handle WSL/Windows path differences - use env var with sensible defaults
+            # Try multiple locations for the config file
+            if config_path is None:
+                config_path = os.getenv("ALERT_CONFIG_PATH")
+            if config_path is None:
+                # Try project directory first (accessible from Windows Python in WSL)
+                project_path = "/home/venu/Proposals/Jarvis/automations/alert.env"
+                # Try WSL native path
+                wsl_native_path = "/home/venu/.jarvis/.secrets/alert.env"
+                # Try WSL expanded path (may return Windows path on some configs)
+                wsl_expanded_path = os.path.expanduser("~/.jarvis/.secrets/alert.env")
+                # Try Windows junction path
+                win_path = r"C:\Users\Venu\.jarvis\.secrets\alert.env"
+                # Try WSL mount path
+                mount_path = "/mnt/c/Users/Venu/.jarvis/.secrets/alert.env"
+                
+                for p in [project_path, wsl_native_path, wsl_expanded_path, win_path, mount_path]:
+                    if Path(p).exists():
+                        config_path = p
+                        break
+                else:
+                    config_path = project_path  # default fallback
         
         self.config_path = config_path
         self.config = self._load_config()
@@ -83,6 +91,14 @@ class AlertManager:
         if "webhook_url" in config:
             config["channels"]["webhook"]["enabled"] = True
             config["channels"]["webhook"]["url"] = config.pop("webhook_url")
+
+        # Parse ntfy config
+        if "ntfy_enabled" in config:
+            config["channels"]["ntfy"]["enabled"] = config.pop("ntfy_enabled").lower() == "true"
+        if "ntfy_topic" in config:
+            config["channels"]["ntfy"]["topic"] = config.pop("ntfy_topic")
+        if "ntfy_server" in config:
+            config["channels"]["ntfy"]["server"] = config.pop("ntfy_server")
 
         return config
 

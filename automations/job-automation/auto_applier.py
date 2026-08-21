@@ -26,7 +26,7 @@ sys.path.append(str(BASE_DIR.parent))
 sys.path.append(str(BASE_DIR.parent.parent))
 
 from dotenv import load_dotenv
-from jarvis_browser import AsyncBrowser, safe_close_async
+from browser import AsyncBrowser, safe_close_async
 
 # Active portals (4, post 2026-08-11 cut: removed cutshort/freshersworld/
 # wellfound/career_pages/workday — re-login burden + aggregator auth-less
@@ -36,7 +36,7 @@ from portals import (NaukriPortal, InternshalaPortal, IndeedPortal,
                      FounditPortal)
 from db_logger import save_jobs_to_db
 from event_bus import get_bus  # Cross-automation event bus
-from alert_manager import get_alert_manager, alert_critical, alert_warning, alert_info  # Alerting
+from alert_manager import send_alert, send_info, send_warning, send_critical  # Alerting
 
 # ── Load .env ─────────────────────────────────────────────────────────────────
 load_dotenv(Path(__file__).parent / ".env")
@@ -483,15 +483,15 @@ async def check_and_alert_zero_applies(summary: dict):
     ZERO_APPLY_TRACKER.write_text(json.dumps(tracker, indent=2))
 
     # Alert if 2+ consecutive zero-apply runs
-    if tracker["consecutive_zero"] >= 2:
-        alert_warning(
-            "Job Automation: Zero Applications",
-            f"Job automation has had {tracker['consecutive_zero']} consecutive runs "
-            f"with zero applications. Check portal sessions and credentials.",
-            "job-automation",
-            consecutive_zero=tracker["consecutive_zero"],
-            date=today
-        )
+        if tracker["consecutive_zero"] >= 2:
+            send_warning(
+                "Job Automation: Zero Applications",
+                f"Job automation has had {tracker['consecutive_zero']} consecutive runs "
+                f"with zero applications. Check portal sessions and credentials.",
+                "job-automation",
+                consecutive_zero=tracker["consecutive_zero"],
+                date=today
+            )
 
 
 if __name__ == "__main__":
