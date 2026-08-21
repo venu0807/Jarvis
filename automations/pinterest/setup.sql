@@ -1,0 +1,3 @@
+CREATE USER venu WITH PASSWORD 'venu';
+ALTER USER venu CREATEDB;
+CREATE DATABASE pinterest_db OWNER venu;

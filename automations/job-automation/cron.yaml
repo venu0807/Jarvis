@@ -1,0 +1,3 @@
+schedule: "0 9 * * *"  # Daily at 9:00 AM IST
+timezone: "Asia/Kolkata"
+description: "Run job automation pipeline - searches and applies to jobs on Naukri, Internshala, Indeed, Foundit"

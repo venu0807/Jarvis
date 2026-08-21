@@ -1,0 +1,243 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="url(#bg)"/>
+
+  <!-- Sidebar -->
+  <rect x="0" y="0" width="240" height="800" fill="#0b1220"/>
+  <text x="32" y="48" font-size="20" font-weight="700" fill="#f8fafc">⚡ JARVIS</text>
+  <text x="32" y="72" font-size="11" fill="#64748b">v2.4.1 · Production</text>
+
+  <!-- Nav items -->
+  <g font-size="13" fill="#94a3b8">
+    <rect x="16" y="100" width="208" height="40" rx="8" fill="#1e293b"/>
+    <text x="36" y="125" fill="#f8fafc">📊 Dashboard</text>
+
+    <text x="36" y="165">🤖 Automations</text>
+    <text x="36" y="195">📝 Applications</text>
+    <text x="36" y="225">💼 LinkedIn</text>
+    <text x="36" y="255">📌 Pinterest</text>
+    <text x="36" y="285">📚 Interview Prep</text>
+    <text x="36" y="315">⚙️ Settings</text>
+  </g>
+
+  <!-- Top header -->
+  <text x="280" y="48" font-size="24" font-weight="700" fill="#f8fafc">Dashboard</text>
+  <text x="280" y="72" font-size="13" fill="#94a3b8">Real-time operational metrics · Last 24 hours</text>
+
+  <!-- Status badges top right -->
+  <g transform="translate(900, 30)">
+    <rect width="80" height="28" rx="14" fill="#064e3b"/>
+    <circle cx="14" cy="14" r="4" fill="#10b981"/>
+    <text x="26" y="19" font-size="11" fill="#6ee7b7">Healthy</text>
+
+    <rect x="90" width="80" height="28" rx="14" fill="#1e3a8a"/>
+    <text x="100" y="19" font-size="11" fill="#93c5fd">Live data</text>
+
+    <rect x="180" width="80" height="28" rx="14" fill="#7c2d12"/>
+    <text x="190" y="19" font-size="11" fill="#fed7aa">99.2% up</text>
+  </g>
+
+  <!-- Stat cards row -->
+  <g transform="translate(280, 100)">
+    <!-- Card 1: Applications Sent -->
+    <rect width="220" height="120" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="20" y="32" font-size="11" fill="#94a3b8" font-weight="600">APPLICATIONS SENT</text>
+    <text x="20" y="76" font-size="36" font-weight="700" fill="#f8fafc">247</text>
+    <text x="20" y="100" font-size="11" fill="#10b981">↑ 23% vs last week</text>
+    <text x="160" y="32" font-size="20" fill="#3b82f6">📨</text>
+
+    <!-- Card 2: LLM Inferences -->
+    <rect x="240" width="220" height="120" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="260" y="32" font-size="11" fill="#94a3b8" font-weight="600">LLM INFERENCES</text>
+    <text x="260" y="76" font-size="36" font-weight="700" fill="#f8fafc">1,432</text>
+    <text x="260" y="100" font-size="11" fill="#10b981">P95: 720ms</text>
+    <text x="400" y="32" font-size="20" fill="#a855f7">🧠</text>
+
+    <!-- Card 3: Success Rate -->
+    <rect x="480" width="220" height="120" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="500" y="32" font-size="11" fill="#94a3b8" font-weight="600">SUCCESS RATE</text>
+    <text x="500" y="76" font-size="36" font-weight="700" fill="#f8fafc">87.3%</text>
+    <text x="500" y="100" font-size="11" fill="#10b981">↑ 4.1% this month</text>
+    <text x="640" y="32" font-size="20" fill="#10b981">✓</text>
+
+    <!-- Card 4: Active Models -->
+    <rect x="720" width="220" height="120" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="740" y="32" font-size="11" fill="#94a3b8" font-weight="600">ACTIVE MODELS</text>
+    <text x="740" y="76" font-size="36" font-weight="700" fill="#f8fafc">3</text>
+    <text x="740" y="100" font-size="11" fill="#94a3b8">qwen · llama · nomic</text>
+    <text x="880" y="32" font-size="20" fill="#f59e0b">⚙️</text>
+  </g>
+
+  <!-- Main chart: Applications over time -->
+  <g transform="translate(280, 240)">
+    <rect width="600" height="280" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="20" y="32" font-size="14" font-weight="600" fill="#f8fafc">Applications Sent (Last 7 days)</text>
+    <text x="20" y="50" font-size="11" fill="#94a3b8">Across all portals · 247 total</text>
+
+    <!-- Chart area -->
+    <g transform="translate(40, 80)">
+      <!-- Y-axis labels -->
+      <text x="-5" y="0" font-size="10" fill="#64748b" text-anchor="end">60</text>
+      <text x="-5" y="40" font-size="10" fill="#64748b" text-anchor="end">45</text>
+      <text x="-5" y="80" font-size="10" fill="#64748b" text-anchor="end">30</text>
+      <text x="-5" y="120" font-size="10" fill="#64748b" text-anchor="end">15</text>
+      <text x="-5" y="160" font-size="10" fill="#64748b" text-anchor="end">0</text>
+
+      <!-- Grid lines -->
+      <line x1="0" y1="0" x2="540" y2="0" stroke="#334155" stroke-dasharray="2 4"/>
+      <line x1="0" y1="40" x2="540" y2="40" stroke="#334155" stroke-dasharray="2 4"/>
+      <line x1="0" y1="80" x2="540" y2="80" stroke="#334155" stroke-dasharray="2 4"/>
+      <line x1="0" y1="120" x2="540" y2="120" stroke="#334155" stroke-dasharray="2 4"/>
+
+      <!-- Area chart -->
+      <path d="M 0 110 L 90 95 L 180 75 L 270 60 L 360 50 L 450 30 L 540 35 L 540 160 L 0 160 Z"
+            fill="url(#accent)" opacity="0.3"/>
+      <path d="M 0 110 L 90 95 L 180 75 L 270 60 L 360 50 L 450 30 L 540 35"
+            stroke="url(#accent)" stroke-width="2.5" fill="none"/>
+
+      <!-- Data points -->
+      <circle cx="0" cy="110" r="4" fill="#3b82f6"/>
+      <circle cx="90" cy="95" r="4" fill="#3b82f6"/>
+      <circle cx="180" cy="75" r="4" fill="#3b82f6"/>
+      <circle cx="270" cy="60" r="4" fill="#3b82f6"/>
+      <circle cx="360" cy="50" r="4" fill="#3b82f6"/>
+      <circle cx="450" cy="30" r="4" fill="#10b981"/>
+      <circle cx="540" cy="35" r="4" fill="#3b82f6"/>
+
+      <!-- X-axis labels -->
+      <text x="0" y="180" font-size="10" fill="#64748b" text-anchor="middle">Mon</text>
+      <text x="90" y="180" font-size="10" fill="#64748b" text-anchor="middle">Tue</text>
+      <text x="180" y="180" font-size="10" fill="#64748b" text-anchor="middle">Wed</text>
+      <text x="270" y="180" font-size="10" fill="#64748b" text-anchor="middle">Thu</text>
+      <text x="360" y="180" font-size="10" fill="#64748b" text-anchor="middle">Fri</text>
+      <text x="450" y="180" font-size="10" fill="#64748b" text-anchor="middle">Sat</text>
+      <text x="540" y="180" font-size="10" fill="#64748b" text-anchor="middle">Sun</text>
+    </g>
+  </g>
+
+  <!-- Right panel: Recent activity -->
+  <g transform="translate(900, 240)">
+    <rect width="280" height="280" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="20" y="32" font-size="14" font-weight="600" fill="#f8fafc">Recent Activity</text>
+
+    <g transform="translate(20, 60)" font-size="11">
+      <!-- Activity items -->
+      <circle cx="6" cy="6" r="4" fill="#10b981"/>
+      <text x="20" y="9" fill="#f8fafc" font-weight="600">Application sent</text>
+      <text x="20" y="24" fill="#94a3b8">Full Stack AI Engineer @ Sarvam</text>
+      <text x="20" y="40" fill="#64748b" font-size="10">2 minutes ago</text>
+
+      <circle cx="6" cy="76" r="4" fill="#3b82f6"/>
+      <text x="20" y="79" fill="#f8fafc" font-weight="600">Cover letter generated</text>
+      <text x="20" y="94" fill="#94a3b8">qwen2.5-coder · 820ms</text>
+      <text x="20" y="110" fill="#64748b" font-size="10">3 minutes ago</text>
+
+      <circle cx="6" cy="146" r="4" fill="#f59e0b"/>
+      <text x="20" y="149" fill="#f8fafc" font-weight="600">Alert resolved</text>
+      <text x="20" y="164" fill="#94a3b8">HighScraperErrorRate · Indeed</text>
+      <text x="20" y="180" fill="#64748b" font-size="10">12 minutes ago</text>
+
+      <circle cx="6" cy="216" r="4" fill="#a855f7"/>
+      <text x="20" y="219" fill="#f8fafc" font-weight="600">Model pre-warmed</text>
+      <text x="20" y="234" fill="#94a3b8">llama3.2:3b · for next run</text>
+      <text x="20" y="250" fill="#64748b" font-size="10">1 hour ago</text>
+    </g>
+  </g>
+
+  <!-- Bottom row: Model latency + Portals -->
+  <g transform="translate(280, 540)">
+    <!-- Model latency card -->
+    <rect width="290" height="220" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="20" y="32" font-size="14" font-weight="600" fill="#f8fafc">LLM Latency P95</text>
+    <text x="20" y="50" font-size="11" fill="#94a3b8">By model · last 24h</text>
+
+    <g transform="translate(20, 80)" font-size="11">
+      <text fill="#94a3b8">qwen2.5-coder:3b</text>
+      <text x="250" y="0" fill="#10b981" text-anchor="end" font-weight="600">680ms</text>
+      <rect y="8" width="220" height="6" rx="3" fill="#334155"/>
+      <rect y="8" width="176" height="6" rx="3" fill="url(#greenGrad)"/>
+
+      <text y="40" fill="#94a3b8">llama3.2:3b</text>
+      <text x="250" y="40" fill="#f59e0b" text-anchor="end" font-weight="600">920ms</text>
+      <rect y="48" width="220" height="6" rx="3" fill="#334155"/>
+      <rect y="48" width="138" height="6" rx="3" fill="#f59e0b"/>
+
+      <text y="80" fill="#94a3b8">nomic-embed-text</text>
+      <text x="250" y="80" fill="#10b981" text-anchor="end" font-weight="600">145ms</text>
+      <rect y="88" width="220" height="6" rx="3" fill="#334155"/>
+      <rect y="88" width="44" height="6" rx="3" fill="url(#greenGrad)"/>
+    </g>
+
+    <!-- Portals card -->
+    <rect x="310" width="290" height="220" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="330" y="32" font-size="14" font-weight="600" fill="#f8fafc">Applications by Portal</text>
+    <text x="330" y="50" font-size="11" fill="#94a3b8">Last 30 days · 247 total</text>
+
+    <g transform="translate(330, 80)" font-size="11">
+      <text fill="#94a3b8">Naukri</text>
+      <text x="250" y="0" fill="#f8fafc" text-anchor="end" font-weight="600">98</text>
+      <rect y="8" width="220" height="6" rx="3" fill="#334155"/>
+      <rect y="8" width="87" height="6" rx="3" fill="#3b82f6"/>
+
+      <text y="40" fill="#94a3b8">Internshala</text>
+      <text x="250" y="40" fill="#f8fafc" text-anchor="end" font-weight="600">62</text>
+      <rect y="48" width="220" height="6" rx="3" fill="#334155"/>
+      <rect y="48" width="55" height="6" rx="3" fill="#06b6d4"/>
+
+      <text y="80" fill="#94a3b8">Indeed</text>
+      <text x="250" y="80" fill="#f8fafc" text-anchor="end" font-weight="600">51</text>
+      <rect y="88" width="220" height="6" rx="3" fill="#334155"/>
+      <rect y="88" width="45" height="6" rx="3" fill="#a855f7"/>
+
+      <text y="120" fill="#94a3b8">Foundit</text>
+      <text x="250" y="120" fill="#f8fafc" text-anchor="end" font-weight="600">36</text>
+      <rect y="128" width="220" height="6" rx="3" fill="#334155"/>
+      <rect y="128" width="32" height="6" rx="3" fill="#10b981"/>
+    </g>
+
+    <!-- Alert pipeline card -->
+    <rect x="620" width="280" height="220" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="640" y="32" font-size="14" font-weight="600" fill="#f8fafc">Alert Pipeline</text>
+    <text x="640" y="50" font-size="11" fill="#94a3b8">Prometheus → AlertManager → ntfy.sh</text>
+
+    <g transform="translate(640, 80)" font-size="11">
+      <!-- Pipeline flow boxes -->
+      <rect width="60" height="40" rx="6" fill="#1e3a8a"/>
+      <text x="30" y="20" fill="#93c5fd" text-anchor="middle" font-size="10" font-weight="600">Scraper</text>
+      <text x="30" y="32" fill="#93c5fd" text-anchor="middle" font-size="9">3 active</text>
+
+      <line x1="60" y1="20" x2="80" y2="20" stroke="#475569" stroke-width="2"/>
+      <polygon points="80,16 88,20 80,24" fill="#475569"/>
+
+      <rect x="92" width="60" height="40" rx="6" fill="#7c2d12"/>
+      <text x="122" y="20" fill="#fed7aa" text-anchor="middle" font-size="10" font-weight="600">Prometheus</text>
+      <text x="122" y="32" fill="#fed7aa" text-anchor="middle" font-size="9">15s scrape</text>
+
+      <line x1="152" y1="20" x2="172" y2="20" stroke="#475569" stroke-width="2"/>
+      <polygon points="172,16 180,20 172,24" fill="#475569"/>
+
+      <rect x="184" width="60" height="40" rx="6" fill="#064e3b"/>
+      <text x="214" y="20" fill="#6ee7b7" text-anchor="middle" font-size="10" font-weight="600">AlertMgr</text>
+      <text x="214" y="32" fill="#6ee7b7" text-anchor="middle" font-size="9">5 rules</text>
+
+      <text x="20" y="80" fill="#10b981">✓ All systems healthy</text>
+      <text x="20" y="100" fill="#94a3b8">Last alert: 12 minutes ago</text>
+      <text x="20" y="120" fill="#94a3b8">Auto-recovery: enabled</text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,31 @@
+# Shared Base Image for JARVIS Automations
+FROM python:3.11-slim AS base
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-client \
+    libpq-dev \
+    chromium \
+    chromium-driver \
+    fonts-liberation \
+    fonts-noto-color-emoji \
+    fonts-dejavu-core \
+    fonts-freefont-ttf \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    HEADLESS=true \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+# Create app directory
+WORKDIR /app
+
+# Install Playwright browsers (dependencies already installed via apt)
+RUN playwright install chromium
+
+# Install common Python dependencies
+COPY requirements-base.txt .
+RUN pip install --no-cache-dir -r requirements-base.txt

@@ -1,0 +1,127 @@
+[
+  {
+    "project_name": "JARVIS",
+    "tech_stack": "Python, Docker, Ollama, Playwright, PostgreSQL, Prometheus, Grafana",
+    "description": "Local-first AI automation platform with 25+ production workflows. Browser context pool, lazy model loading for 8 GB RAM, full observability stack. 99.2% uptime, $0 cloud AI cost. github.com/venu0807/Jarvis"
+  },
+  {
+    "project_name": "SafeAI",
+    "tech_stack": "Python, TensorFlow, Java, Android",
+    "description": "CNN-based real-time audio threat detection for Android edge devices. 89% model accuracy, sub-100ms inference. End-to-end MLOps: training → quantization → deployment → SMS alerts with GPS. github.com/venu0807/SafeAI"
+  },
+  {
+    "project_name": "Recommendation_System",
+    "tech_stack": "Python, Django REST Framework, React, MySQL, Scikit-learn",
+    "description": "Full-stack movie recommendation platform. Content-based filtering using cosine similarity. Normalized schema for 10,000+ records, 60% query latency reduction. JWT auth + pagination. github.com/venu0807/Recommendation_System"
+  },
+  {
+    "project_name": "RoastMyCV",
+    "tech_stack": "TypeScript, React, OpenAI-compatible APIs",
+    "description": "AI-powered resume reviewer providing brutally honest, actionable feedback. Real-time analysis with structured scoring per section. github.com/venu0807/roastmycv"
+  },
+  {
+    "project_name": "AI-Based-University-Query-Assistant",
+    "tech_stack": "Python, RAG, Vector DB, LLM",
+    "description": "Retrieval-augmented generation chatbot for university queries. Document ingestion + chunking + vector retrieval + LLM response generation. github.com/venu0807/AI-Based-University-Query-Assistant"
+  },
+  {
+    "project_name": "ai-coding-agent",
+    "tech_stack": "Python, agentic loops, tool calling",
+    "description": "Agentic AI coding assistant that plans, executes, and iterates on software engineering tasks autonomously. Multi-step reasoning with tool calling. github.com/venu0807/ai-coding-agent"
+  },
+  {
+    "project_name": "ai-coding-factory",
+    "tech_stack": "TypeScript, agentic workflows",
+    "description": "AI tooling factory for code generation and transformation workflows. github.com/venu0807/ai-coding-factory"
+  },
+  {
+    "project_name": "briefforge",
+    "tech_stack": "TypeScript, React, Next.js",
+    "description": "Content generation tool with templates and AI-assisted writing workflows. github.com/venu0807/briefforge"
+  },
+  {
+    "project_name": "website-prospector",
+    "tech_stack": "Python, web scraping, lead scoring",
+    "description": "Lead generation tool that identifies and scores potential B2B prospects from public web data. github.com/venu0807/website-prospector"
+  },
+  {
+    "project_name": "picscore",
+    "tech_stack": "TypeScript, image processing, ML scoring",
+    "description": "Visual scoring application for image quality assessment using ML models. github.com/venu0807/picscore"
+  },
+  {
+    "project_name": "affiliate-store",
+    "tech_stack": "TypeScript, Next.js, Stripe, headless commerce",
+    "description": "Full e-commerce platform with affiliate marketing integrations. github.com/venu0807/affiliate-store"
+  },
+  {
+    "project_name": "finance_backend",
+    "tech_stack": "Python, FastAPI, PostgreSQL",
+    "description": "Financial APIs backend with transaction processing, reporting, and audit trails. github.com/venu0807/finance_backend"
+  },
+  {
+    "project_name": "DJ",
+    "tech_stack": "Python, Django REST Framework",
+    "description": "Django REST API boilerplate with auth, permissions, and best practices baked in. github.com/venu0807/DJ"
+  },
+  {
+    "project_name": "HealthCare",
+    "tech_stack": "Python, Django, HIPAA-aware patterns",
+    "description": "Healthcare platform with patient records, appointment booking, and provider management. github.com/venu0807/HealthCare"
+  },
+  {
+    "project_name": "hn-scraper",
+    "tech_stack": "JavaScript, Node.js, web scraping",
+    "description": "Hacker News scraper for trend analysis and content aggregation. github.com/venu0807/hn-scraper"
+  },
+  {
+    "project_name": "Event-Intelligence-Program",
+    "tech_stack": "TypeScript, event-driven architecture",
+    "description": "Event intelligence platform with real-time processing pipelines. github.com/venu0807/Event-Intelligence-Program"
+  },
+  {
+    "project_name": "ANN-Classification-Churn-Prediction",
+    "tech_stack": "Python, TensorFlow, Jupyter",
+    "description": "Customer churn prediction using artificial neural networks with feature engineering and evaluation. github.com/venu0807/ANN-Classification-Churn-Prediction"
+  },
+  {
+    "project_name": "Synthetic-Fraud-AI",
+    "tech_stack": "Python, Jupyter, fraud detection",
+    "description": "Synthetic data generation for fraud detection model training and evaluation. github.com/venu0807/Synthetic-Fraud-AI"
+  },
+  {
+    "project_name": "Nutrition_Agent",
+    "tech_stack": "Python, Jupyter, agent-based systems",
+    "description": "Agent-based nutrition recommendation system. github.com/venu0807/Nutrition_Agent"
+  },
+  {
+    "project_name": "Machine_Learining-Deep_Learining",
+    "tech_stack": "Python, Jupyter, ML/DL coursework",
+    "description": "Collection of ML and Deep Learning experiments, tutorials, and coursework implementations. github.com/venu0807/Machine_Learining-Deep_Learining"
+  },
+  {
+    "project_name": "node-easy-notes-app",
+    "tech_stack": "JavaScript, Node.js, Express",
+    "description": "Simple notes application with full CRUD API. github.com/venu0807/node-easy-notes-app"
+  },
+  {
+    "project_name": "Automation---QA-Developer",
+    "tech_stack": "JavaScript, QA automation",
+    "description": "QA automation suite with test framework integrations. github.com/venu0807/Automation---QA-Developer"
+  },
+  {
+    "project_name": "ai-excel-interviewer",
+    "tech_stack": "Python, AI agent, interview system",
+    "description": "AI-powered Excel skills interviewer that adapts questions based on candidate responses. github.com/venu0807/ai-excel-interviewer"
+  },
+  {
+    "project_name": "rls-guard-dog",
+    "tech_stack": "TypeScript, Postgres RLS, security",
+    "description": "Postgres Row-Level Security guard dog for multi-tenant SaaS applications. github.com/venu0807/rls-guard-dog"
+  },
+  {
+    "project_name": "portfolio + portfolio_1",
+    "tech_stack": "TypeScript, Next.js, Tailwind",
+    "description": "Personal portfolio sites deployed at venureddy.vercel.app. github.com/venu0807/portfolio, github.com/venu0807/portfolio_1"
+  }
+]

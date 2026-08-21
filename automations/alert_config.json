@@ -1,0 +1,30 @@
+{
+  "rate_limit": {
+    "max_per_hour": 10,
+    "max_per_day": 50
+  },
+  "dedup_window_minutes": 60,
+  "channels": {
+    "telegram": {
+      "enabled": false,
+      "bot_token": "${TELEGRAM_BOT_TOKEN}",
+      "chat_id": "${TELEGRAM_CHAT_ID}"
+    },
+    "email": {
+      "enabled": false,
+      "smtp_server": "${EMAIL_SMTP_SERVER}",
+      "smtp_port": 587,
+      "username": "${EMAIL_USERNAME}",
+      "password": "${EMAIL_PASSWORD}",
+      "from_addr": "${EMAIL_FROM_ADDR}",
+      "to_addrs": "${EMAIL_TO_ADDRS}"
+    },
+    "webhook": {
+      "enabled": false,
+      "url": "${WEBHOOK_URL}",
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  }
+}
