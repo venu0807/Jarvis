@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
 # 🚀 JARVIS MASTER START SCRIPT (Start EVERYTHING)
-# Starts all core services, AI engines, dashboard, and background listeners.
+# Starts core services, AI engine, dashboard, n8n, and background listeners.
 # ==============================================================================
 
 echo "======================================================"
@@ -17,13 +17,14 @@ service postgresql start 2>/dev/null || true
 echo "▶ [2/5] Starting Local AI Engine (Ollama)..."
 if ! pgrep -f "ollama serve" > /dev/null; then
     su - venu -c "export OLLAMA_KEEP_ALIVE=30s && nohup /usr/local/bin/ollama serve > /dev/null 2>&1 &"
-    echo "  ✔ Ollama service launched (OLLAMA_KEEP_ALIVE=30s for automatic RAM release)."
+    echo "  ✔ Ollama service launched (OLLAMA_KEEP_ALIVE=30s)."
 else
     echo "  ✔ Ollama is already running."
 fi
 
-# 3. Start Next.js Web Dashboard via PM2
-echo "▶ [3/5] Starting Jarvis Web Dashboard (Port 3001)..."
+# 3. Start Next.js Web Dashboard & n8n Workflow Automation via PM2
+echo "▶ [3/5] Starting Web Dashboard & n8n Workflows..."
+su - venu -c "pm2 start /usr/local/bin/n8n --name 'n8n' -- start 2>/dev/null || pm2 restart n8n 2>/dev/null"
 su - venu -c "cd /home/venu/Proposals/Jarvis/automations/dashboard-nextjs && (pm2 restart jarvis-dashboard 2>/dev/null || pm2 start npm --name 'jarvis-dashboard' -- start)"
 
 # 4. Start 24/7 Automation Listeners
@@ -48,10 +49,11 @@ sleep 2
 
 echo ""
 echo "======================================================"
-echo "  ✅ ALL JARVIS SYSTEMS ARE ONLINE & OPERATIONAL!"
+echo "  ✅ ALL JARVIS SYSTEMS & N8N ARE ONLINE!"
 echo "======================================================"
-echo "  🌐 Dashboard URL: http://localhost:3001"
-echo "  🧠 Local AI Engine: Ready (Auto-unloads after 30s)"
-echo "  📅 Interview Listener: Active (24/7 IMAP)"
-echo "  💼 Job Monitor: Active"
+echo "  🌐 Dashboard URL:    http://localhost:3001"
+echo "  ⚡ n8n Workflows URL: http://localhost:5678"
+echo "  🧠 Local AI Engine:  Ready (Auto-unloads after 30s)"
+echo "  📅 Interview Bot:    Active (24/7 IMAP)"
+echo "  💼 Job Alert Bot:    Active"
 echo "======================================================"

@@ -1,18 +1,19 @@
 #!/bin/bash
 # ==============================================================================
 # 🛑 JARVIS MASTER SHUTDOWN SCRIPT (Stop EVERYTHING)
-# Safely stops all dashboards, listeners, AI servers, daemons, and flushes RAM.
+# Safely stops dashboards, n8n, listeners, AI servers, daemons, and flushes RAM.
 # ==============================================================================
 
 echo "======================================================"
-echo "         🛑 SHUTTING DOWN JARVIS SYSTEM"
+echo "         🛑 SHUTTING DOWN JARVIS & N8N SYSTEM"
 echo "======================================================"
 
-# 1. Stop Next.js Dashboard & PM2 Apps
-echo "▶ [1/6] Stopping Next.js Dashboard & PM2 processes..."
+# 1. Stop Next.js Dashboard, n8n & PM2 Apps
+echo "▶ [1/6] Stopping Next.js Dashboard, n8n & PM2 processes..."
 su - venu -c "pm2 stop all 2>/dev/null" || true
 pkill -f "next-server" 2>/dev/null || true
 pkill -f "next" 2>/dev/null || true
+pkill -f "n8n" 2>/dev/null || true
 
 # 2. Stop 24/7 Automation Listeners & Python Pipelines
 echo "▶ [2/6] Stopping Background Python Automations..."
@@ -24,7 +25,6 @@ pkill -f "followup_bot.py" 2>/dev/null || true
 pkill -f "cleanup_bot.py" 2>/dev/null || true
 pkill -f "linkedin-outreach" 2>/dev/null || true
 pkill -f "streamlit" 2>/dev/null || true
-pkill -f "n8n" 2>/dev/null || true
 
 # 3. Stop Local AI Engine (Ollama)
 echo "▶ [3/6] Stopping Local AI Engine (Ollama)..."
@@ -46,7 +46,7 @@ echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
 
 echo ""
 echo "======================================================"
-echo "  ✅ ALL JARVIS PROCESSES & DAEMONS ARE FULLY STOPPED!"
+echo "  ✅ ALL JARVIS PROCESSES & N8N ARE FULLY STOPPED!"
 echo "======================================================"
 echo "  💾 Current WSL Memory Status:"
 free -h
