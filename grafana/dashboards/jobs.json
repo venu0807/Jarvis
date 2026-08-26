@@ -1,0 +1,109 @@
+{
+    "title": "Job Automation Dashboard",
+    "uid": "jobs-dashboard-01",
+    "refresh": "1m",
+    "panels": [
+        {
+            "type": "stat",
+            "title": "Total Jobs Scraped",
+            "gridPos": {
+                "x": 0,
+                "y": 0,
+                "w": 8,
+                "h": 6
+            },
+            "datasource": {
+                "type": "postgres",
+                "uid": "postgres_jobs_uid"
+            },
+            "targets": [
+                {
+                    "rawSql": "SELECT COUNT(*) FROM jobs",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "type": "stat",
+            "title": "Seen Jobs",
+            "gridPos": {
+                "x": 8,
+                "y": 0,
+                "w": 8,
+                "h": 6
+            },
+            "datasource": {
+                "type": "postgres",
+                "uid": "postgres_jobs_uid"
+            },
+            "targets": [
+                {
+                    "rawSql": "SELECT COUNT(*) FROM seen_jobs",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "type": "stat",
+            "title": "Unhandled Questions",
+            "gridPos": {
+                "x": 16,
+                "y": 0,
+                "w": 8,
+                "h": 6
+            },
+            "datasource": {
+                "type": "postgres",
+                "uid": "postgres_jobs_uid"
+            },
+            "targets": [
+                {
+                    "rawSql": "SELECT COUNT(*) FROM unhandled_questions",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "type": "barchart",
+            "title": "Jobs by Status",
+            "gridPos": {
+                "x": 0,
+                "y": 6,
+                "w": 12,
+                "h": 8
+            },
+            "datasource": {
+                "type": "postgres",
+                "uid": "postgres_jobs_uid"
+            },
+            "targets": [
+                {
+                    "rawSql": "SELECT status, COUNT(*) as count FROM jobs GROUP BY status",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "type": "table",
+            "title": "Recent Job Communications",
+            "gridPos": {
+                "x": 12,
+                "y": 6,
+                "w": 12,
+                "h": 8
+            },
+            "datasource": "Postgres_Jobs",
+            "targets": [
+                {
+                    "rawSql": "SELECT timestamp, company, inferred_status FROM job_communications ORDER BY timestamp DESC LIMIT 20",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ]
+        }
+    ]
+}

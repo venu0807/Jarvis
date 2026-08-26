@@ -404,3 +404,329 @@ body {
   font-weight: 700;
   color: white;
 }
+
+/* --- JOB TRACKER STYLES --- */
+
+.tracker-panel {
+  display: flex;
+  flex-direction: column;
+  height: 800px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.tracker-charts {
+  display: flex;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(11, 12, 16, 0.4);
+}
+
+.chart-box {
+  flex: 1;
+  background: rgba(31, 40, 51, 0.8);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.chart-box h4 {
+  margin: 0 0 1rem 0;
+  font-size: 0.9rem;
+  color: var(--text-accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tracker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+}
+
+.tracker-filters {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.tracker-input, .tracker-select {
+  background-color: rgba(11, 12, 16, 0.7);
+  border: 1px solid var(--panel-border);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  min-width: 150px;
+}
+
+.tracker-input:focus, .tracker-select:focus {
+  border-color: var(--text-accent);
+}
+
+.export-csv-btn {
+  background: rgba(69, 162, 158, 0.2);
+  color: var(--text-accent);
+  border: 1px solid rgba(102, 252, 241, 0.5);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.export-csv-btn:hover {
+  background: rgba(102, 252, 241, 0.2);
+  box-shadow: 0 0 10px rgba(102, 252, 241, 0.2);
+}
+
+.tracker-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.job-list {
+  width: 350px;
+  border-right: 1px solid var(--panel-border);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.job-list::-webkit-scrollbar {
+  width: 6px;
+}
+.job-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.job-list::-webkit-scrollbar-thumb {
+  background: rgba(102, 252, 241, 0.2);
+  border-radius: 3px;
+}
+
+.job-card {
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid rgba(102, 252, 241, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.job-card:hover {
+  background: rgba(69, 162, 158, 0.1);
+}
+
+.job-card.selected {
+  background: rgba(102, 252, 241, 0.1);
+  border-left: 3px solid var(--text-accent);
+}
+
+.job-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.3rem;
+}
+
+.job-company {
+  margin: 0;
+  font-size: 1rem;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.job-title {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.5rem;
+}
+
+.job-meta {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.job-detail {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.job-detail::-webkit-scrollbar {
+  width: 8px;
+}
+.job-detail::-webkit-scrollbar-track {
+  background: transparent;
+}
+.job-detail::-webkit-scrollbar-thumb {
+  background: rgba(102, 252, 241, 0.2);
+  border-radius: 4px;
+}
+
+.empty-detail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.detail-header h2 {
+  margin: 0;
+  font-size: 2rem;
+  border: none;
+  padding: 0;
+  color: white;
+}
+
+.detail-title {
+  color: var(--text-accent);
+  font-size: 1.3rem;
+  margin: 0 0 2rem 0;
+  font-weight: 500;
+}
+
+.detail-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  background: rgba(11, 12, 16, 0.5);
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  margin-bottom: 2rem;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.meta-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+}
+
+.view-job-btn {
+  display: inline-block;
+  background: rgba(102, 252, 241, 0.15);
+  color: var(--text-accent);
+  border: 1px solid var(--text-accent);
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  margin-bottom: 2rem;
+}
+
+.view-job-btn:hover {
+  background: rgba(102, 252, 241, 0.3);
+}
+
+.detail-description {
+  color: #e0e0e0;
+  background: rgba(11, 12, 16, 0.3);
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(102, 252, 241, 0.05);
+}
+
+.no-jobs {
+  text-align: center;
+  color: var(--text-secondary);
+  margin-top: 2rem;
+}
+
+/* Status Badges */
+.status-badge-small {
+  font-size: 0.65rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.status-badge-large {
+  font-size: 0.8rem;
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border: 1px solid;
+}
+
+.status-applied {
+  background: rgba(102, 252, 241, 0.2);
+  color: var(--text-accent);
+  border: 1px solid rgba(102, 252, 241, 0.5);
+}
+
+.status-manual {
+  background: rgba(242, 169, 0, 0.2);
+  color: #f2a900;
+  border: 1px solid rgba(242, 169, 0, 0.5);
+}
+
+.status-skipped {
+  background: rgba(197, 198, 199, 0.2);
+  color: #c5c6c7;
+  border: 1px solid rgba(197, 198, 199, 0.5);
+}
+
+.status-interview {
+  background: rgba(80, 200, 120, 0.2);
+  color: #50c878;
+  border: 1px solid rgba(80, 200, 120, 0.5);
+  box-shadow: 0 0 10px rgba(80, 200, 120, 0.4);
+}
+
+.status-rejected {
+  background: rgba(255, 68, 68, 0.2);
+  color: #ff4444;
+  border: 1px solid rgba(255, 68, 68, 0.5);
+}
+
+.status-action_required {
+  background: rgba(255, 153, 51, 0.2);
+  color: #ff9933;
+  border: 1px solid rgba(255, 153, 51, 0.5);
+  animation: pulse-orange 2s infinite;
+}
+
+@keyframes pulse-orange {
+  0% { box-shadow: 0 0 0 0 rgba(255, 153, 51, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 153, 51, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 153, 51, 0); }
+}
+
+.status-failed, .status-error {
+  background: rgba(255, 68, 68, 0.15);
+  color: #ff4444;
+  border-color: rgba(255, 68, 68, 0.3);
+}

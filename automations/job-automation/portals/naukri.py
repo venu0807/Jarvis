@@ -181,15 +181,24 @@ class NaukriPortal(BasePortal):
 
                     print(f"  🔍 Naukri: {len(job_data)} jobs for '{role}' in {city}")
 
-                    for jd in job_data:
-                        if applied >= daily_limit:
-                            break
+                    queue = job_data.copy()
+                    visited = set(jd.get("href", "").strip() for jd in queue)
+
+                    while queue and applied < daily_limit:
+                        jd = queue.pop(0)
 
                         href    = jd.get("href", "").strip()
                         title   = jd.get("title", "").strip()
                         company = jd.get("company", "Unknown").strip()
 
                         if not href or not title:
+                            continue
+
+                        # ── Role relevance filter ────────────────────────────
+                        role_keywords = [w.lower() for w in role.split() if len(w) > 3]
+                        title_lower = title.lower()
+                        if role_keywords and not any(kw in title_lower for kw in role_keywords):
+                            print(f"     ⏩ Skipping unrelated: {title}")
                             continue
 
                         job_id = f"naukri_{hashlib.sha256(href.encode()).hexdigest()[:10]}"
@@ -210,6 +219,23 @@ class NaukriPortal(BasePortal):
 
                         print(f"\n  → {title} @ {company} ({city})")
                         try:
+                            # Pre-visit to extract similar jobs
+                            try:
+                                await page.goto(href, wait_until="domcontentloaded", timeout=TIMEOUT)
+                                await page.wait_for_timeout(2000)
+                                similar_jobs = await self.extract_similar_jobs(page, roles, city)
+                                new_jobs = 0
+                                for s_job in similar_jobs:
+                                    s_href = s_job.get("href", "").strip()
+                                    if s_href and s_href not in visited:
+                                        visited.add(s_href)
+                                        queue.append(s_job)
+                                        new_jobs += 1
+                                if new_jobs > 0:
+                                    print(f"     🔍 Found {new_jobs} similar jobs on page. Added to queue.")
+                            except Exception:
+                                pass
+
                             result = await self.apply_to_job(page, job)
                             results.append(result)
 
@@ -301,6 +327,43 @@ class NaukriPortal(BasePortal):
         if "current location" in q or "current city" in q or "currently located" in q or "current address" in q:
             return "Delhi"
 
+        # Reason for change / leaving current company
+        if any(k in q for k in ["reason for change", "reason for leaving", "why are you looking", "why do you want to change", "reason for job change"]):
+            return "I am a fresher seeking career growth and learning opportunities as a developer."
+
+        # Expectations from next job / role / company
+        if any(k in q for k in [
+            "expect from your next", "expect from this", "expectations from", "expectation from",
+            "what do you expect", "looking for in your next", "what are you looking for",
+            "career goal", "career aspiration", "future goal", "work expectations"
+        ]):
+            return "A collaborative environment with strong learning and career growth opportunities as a software developer."
+
+        # Why hire you / Why join company
+        if any(k in q for k in [
+            "why should we hire", "why hire you", "why do you want to join", "why are you interested",
+            "what makes you a good fit", "why this role", "why this company", "why our company"
+        ]):
+            return "I have strong foundational skills in Python, backend development, and AI/ML, and I am eager to learn quickly and contribute effectively."
+
+        # Self-intro / Summary
+        if any(k in q for k in [
+            "tell me about yourself", "about yourself", "brief intro", "introduce yourself", "your background"
+        ]):
+            return "I am an MCA graduate specializing in Python, AI/ML, and Full Stack development with hands-on project experience."
+
+        # Strengths
+        if any(k in q for k in ["your strength", "strengths", "key skill", "top skill"]):
+            return "Python, Django, React, Machine Learning, Fast Learner, Problem Solving"
+
+        # Relatives / Referral / Relationship
+        if any(k in q for k in ["name and relationship", "relatives working", "any relatives", "referral name", "employee referral"]):
+            return "N/A"
+
+        # Graduation year / batch
+        if any(k in q for k in ["year of graduation", "graduation year", "year of passing", "passing year", "batch"]):
+            return "2026"
+
         if "gender" in q or "sex" in q:
             return "Male"
         elif "dob" in q or "date of birth" in q or "birth date" in q or "birthday" in q:
@@ -335,19 +398,28 @@ class NaukriPortal(BasePortal):
         elif q.strip() == "age" or "your age" in q or "what is your age" in q or ("age" in q and "experience" not in q and "agent" not in q and "package" not in q):
             return "24"
         elif "ctc" in q or "salary" in q or "lpa" in q or "income" in q or "compensation" in q or "package" in q or "variable" in q or "pay" in q or "lac" in q or "lakh" in q:
-            if "expected" in q or "desired" in q:
+            if "expected" in q or "desired" in q or "target" in q:
                 if "lac" in q or "lakh" in q or "lpa" in q:
-                    return "6"
-                return "600000"
+                    return "4"
+                return "400000"
+            if "current" in q or "present" in q:
+                if "lac" in q or "lakh" in q or "lpa" in q:
+                    return "0"
+                return "0"
             if "lac" in q or "lakh" in q or "lpa" in q:
-                return "1"
-            return "0"
+                return "4"
+            return "400000"
         elif "notice" in q or "join" in q or "serving" in q:
             if "immediate" in q or "days" in q or "month" in q:
                 return "Immediate"
             return "15 days"
-        elif "degree" in q or "qualification" in q or "education" in q or "college" in q or "university" in q:
+        # Specific degree levels
+        elif any(k in q for k in ["bachelor degree", "undergraduate degree", "ug degree", "bachelors degree", "bachelor qualification"]):
+            return "BSc"
+        elif any(k in q for k in ["master degree", "post graduate", "pg degree", "highest qualification", "highest degree"]):
             return "MCA"
+        elif "degree" in q or "qualification" in q or "education" in q or "college" in q or "university" in q or "highest" in q:
+            return "Masters" 
         elif "skill" in q or "proficien" in q or "familiar" in q or "knowledge" in q or "know" in q:
             # Check if the question mentions a skill from the resume
             if self._has_resume_skill(q):
@@ -441,17 +513,34 @@ class NaukriPortal(BasePortal):
                 if opt:
                     return opt
 
+        # Graduation Year / Batch options
+        if any(k in q for k in ["year of graduation", "graduation year", "passing year", "year of passing", "batch"]):
+            opt = find_opt(["2026", "2025", "2024", "2027"])
+            if opt:
+                return opt
+
+        # General agreement / laptop / comfortable / available
+        if any(k in q for k in ["comfortable", "eligible", "bring and work", "laptop", "relocate", "willing", "ready", "available to join"]):
+            opt = find_opt(["yes", "agree", "accept", "willing"])
+            if opt:
+                return opt
+
         # Notice Period
         if any(k in q for k in ["notice", "join", "serving", "how soon"]):
             opt = find_opt(["immediate", "15 days", "30 days", "1 month", "serving notice"])
             if opt:
                 return opt
 
-        # Education / Degree
-        if any(k in q for k in ["degree", "qualification", "education", "highest study",
-                                 "college", "choose the degree"]):
-            opt = find_opt(["mca", "b.tech", "btech", "b. tech", "bachelor", "master",
-                            "graduate", "post graduate"])
+        # Bachelor's Degree specific question
+        if any(k in q for k in ["bachelor", "ug", "undergraduate", "graduation degree", "b.sc", "bsc"]):
+            opt = find_opt(["bsc", "b.sc", "bachelor of science", "b.sc.", "bca", "bachelors", "bachelor's", "b.tech", "btech", "bachelor"])
+            if opt:
+                return opt
+
+        # Education / Degree (Master's / Highest by default)
+        if any(k in q for k in ["degree", "qualification", "education", "highest study", "college", "choose the degree"]):
+            opt = find_opt(["masters", "master's", "master", "mca", "post graduate", "postgraduate",
+                            "bachelors", "bachelor's", "bachelor", "b.tech", "btech", "graduate"])
             if opt:
                 return opt
 
@@ -498,7 +587,7 @@ class NaukriPortal(BasePortal):
 
         # General preference fallback
         prefs = [
-            "mca", "b.tech", "btech", "b. tech", "bachelor's", "master's",
+            "masters", "master's", "master", "mca", "post graduate", "b.tech", "bachelor's",
             "graduate", "post graduate", "immediate", "15 days", "30 days",
             "yes", "agree", "accept", "willing"
         ]
@@ -539,6 +628,39 @@ class NaukriPortal(BasePortal):
 
     # ── Apply ─────────────────────────────────────────────────────────────────
 
+    async def extract_similar_jobs(self, page: Page, roles: list, city: str) -> list:
+        similar = []
+        try:
+            # Extract ALL job data at once via JS
+            job_data = await page.evaluate("""() => {
+                const cards = document.querySelectorAll(
+                    '.similar-jobs-container .jobTuple, .similarJobs article.jobTuple, .similar-jobs .jobTuple'
+                );
+                const results = [];
+                cards.forEach(card => {
+                    const titleEl  = card.querySelector('a.title, h2.title a, .jobTitle a');
+                    const compEl   = card.querySelector('.comp-name, .companyInfo a, .company-name');
+                    if (!titleEl) return;
+                    results.push({
+                        href:    titleEl.href  || '',
+                        title:   titleEl.innerText.trim(),
+                        company: compEl ? compEl.innerText.trim() : 'Unknown',
+                    });
+                });
+                return results;
+            }""")
+            
+            for jd in job_data:
+                title = jd.get("title", "")
+                role_keywords = [w.lower() for r in roles for w in r.split() if len(w) > 3]
+                title_lower = title.lower()
+                if role_keywords and not any(kw in title_lower for kw in role_keywords):
+                    continue
+                similar.append(jd)
+        except:
+            pass
+        return similar
+
     async def apply_to_job(self, page: Page, job: dict) -> ApplicationResult:
         try:
             await page.goto(job["url"], wait_until="domcontentloaded", timeout=TIMEOUT)
@@ -551,6 +673,13 @@ class NaukriPortal(BasePortal):
                     job["description"] = (await desc_el.text_content()).strip()
             except:
                 pass
+            
+            if not job.get("description", "").strip():
+                job["description"] = job.get("title", "")
+
+            # --- Filter by Experience ---
+            if is_experienced_role(job.get("title", ""), job.get("description", "")):
+                return ApplicationResult(job=job, status="skipped", reason="Requires experience (not fresher/intern)")
 
             # Already applied?
             for sel in ["button:has-text('Applied')", ".already-applied", "[class*='alreadyApplied']"]:
@@ -1008,9 +1137,12 @@ class NaukriPortal(BasePortal):
                                 await best["locator"].click(force=True)
                                 await page.wait_for_timeout(1000)
                             else:
-                                # No rule-based match and no LLM to guess —
-                                # skip this question rather than risk a wrong answer.
-                                print(f"     ⏭️  No rule-based match for question — skipping")
+                                # Fallback: pick the first available choice to keep application moving
+                                if options:
+                                    fallback_opt = options[0]
+                                    print(f"     👉 Fallback selecting first option: '{fallback_opt['text']}'")
+                                    await fallback_opt["locator"].click(force=True)
+                                    await page.wait_for_timeout(1000)
                     except Exception as eo:
                         print(f"     ⚠️ Error in options handler: {eo}")
                 except:

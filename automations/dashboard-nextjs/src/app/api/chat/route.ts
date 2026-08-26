@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: "phi4-mini:latest",
+        model: "qwen2.5-coder:3b",
         prompt: finalPrompt,
         stream: false
       })

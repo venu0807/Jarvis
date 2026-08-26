@@ -2,6 +2,7 @@
 portals/base.py — Base class and shared types for all portal automations
 """
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 from playwright.async_api import Page
@@ -28,35 +29,53 @@ class ApplicationResult:
 
 def is_experienced_role(title: str, description: str = "") -> bool:
     """
-    Returns True if the job strictly requires experience and is NOT a fresher/intern role.
+    Returns True if the job strictly requires experience (>1-2 years) and is NOT a fresher/intern role.
     """
+    t_lower = (title or "").lower()
     text = f"{title} {description}".lower()
     
-    if any(x in title.lower() for x in ["intern", "fresher", "trainee", "junior", "entry level"]):
+    # Priority 1: Clear fresher/intern indicators in title ALWAYS pass
+    if any(x in t_lower for x in ["intern", "fresher", "trainee", "graduate trainee", "campus", "entry level", "entry-level"]):
         return False
         
-    # Catch senior/management/mid-level titles
-    if any(x in title.lower() for x in ["senior", "sr.", "sr ", "lead", "staff", "principal", "manager", "director", "head", "architect", "mid-level", "experienced", "vp"]):
+    # Priority 2: Senior, Lead, Management keywords in title ALWAYS fail
+    senior_keywords = [
+        "senior", "sr.", "sr ", "lead", "staff", "principal", "manager", "director",
+        "head", "architect", "mid-level", "mid level", "experienced", "specialist",
+        "consultant", "vp", "avp", "tech lead", "team lead", "sde 2", "sde ii",
+        "sde 3", "sde iii", "sde-2", "sde-ii", "sde-3", "sde-iii", "level 2", "level 3"
+    ]
+    if any(x in t_lower for x in senior_keywords):
         return True
         
-    import re
-    # Reject if it explicitly asks for 1 or more years of experience
-    exp_matches = re.findall(r'([0-9]+)\s*\+\s*(?:years?|yrs?)(?:\s+of)?\s+exp', text)
-    for match in exp_matches:
-        if int(match) >= 1:  # Skip if 1+ years explicitly required
+    # Priority 3: Experience ranges (e.g., "2-5 Yrs", "3 - 6 Years", "2 to 4 years", "1 - 3 Yrs")
+    range_matches = re.findall(r'([0-9]+)\s*(?:to|-)\s*([0-9]+)\s*(?:years?|yrs?|yr)', text)
+    for min_yr, max_yr in range_matches:
+        min_val = int(min_yr)
+        max_val = int(max_yr)
+        # If minimum experience is 2+ years, skip
+        if min_val >= 2:
             return True
-            
-    exp_matches_range = re.findall(r'([0-9]+)\s*(?:to|-)\s*([0-9]+)\s*(?:years?|yrs?)(?:\s+of)?\s+exp', text)
-    for match in exp_matches_range:
-        if int(match[0]) >= 1:  # Skip if minimum experience is 1+ years
+        # If minimum is 1 and max is 3+ (e.g. 1-4 years, 1-5 years), skip
+        if min_val == 1 and max_val >= 3:
             return True
-            
-    # Check for raw "X years experience" without the "+" or "to".
-    # Lookbehind blocks the upper bound of a range ("0-1 years", "0 to 1 years")
-    # from being misread as a standalone "1 years" requirement.
-    raw_exp = re.findall(r'(?<![0-9-])(?<!to )([0-9]+)\s*(?:years?|yrs?)(?:\s+of)?(?:\s+(?:work|professional))?\s+experience', text)
-    for match in raw_exp:
-        if int(match) >= 1:
+
+    # Priority 4: Plus experience (e.g., "2+ years", "3+ Yrs", "2+ yrs exp")
+    plus_matches = re.findall(r'([0-9]+)\s*\+\s*(?:years?|yrs?|yr)', text)
+    for val in plus_matches:
+        if int(val) >= 2:
+            return True
+
+    # Priority 5: Explicit "Exp: X years" or "Experience: X Yrs"
+    labeled_matches = re.findall(r'(?:exp|experience)\s*[:\-]?\s*([0-9]+)\s*(?:to|-)?\s*([0-9]+)?\s*(?:years?|yrs?|yr)?', text)
+    for match in labeled_matches:
+        if match[0] and int(match[0]) >= 2:
+            return True
+
+    # Priority 6: Raw standalone "X years of experience" / "X yrs experience"
+    raw_matches = re.findall(r'(?<![0-9-])(?<!to )([0-9]+)\s*(?:years?|yrs?|yr)(?:\s+of)?(?:\s+(?:work|professional|relevant))?\s+experience', text)
+    for val in raw_matches:
+        if int(val) >= 2:
             return True
 
     return False
@@ -76,6 +95,10 @@ class BasePortal:
 
     async def apply_to_job(self, page: Page, job: dict) -> ApplicationResult:
         raise NotImplementedError
+
+    async def extract_similar_jobs(self, page: Page, roles: list, city: str = "") -> list:
+        """Extract similar jobs from the page, returning a list of job dicts."""
+        return []
 
     async def fill_external_form(self, page: Page) -> bool:
         """

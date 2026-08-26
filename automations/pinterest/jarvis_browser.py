@@ -42,29 +42,29 @@ from pathlib import Path
 from typing import Optional
 
 # Add parent directory to path to import shared_vision
-sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__) / "automations"))
 try:
-    from shared_dom_llm import solve_with_dom_sync, solve_with_dom_async
+    from automations.shared_vision import solve_with_vision, solve_with_vision_async
 except ImportError:
-    # Fallback if shared_dom_llm isn't available
-    solve_with_dom_sync = None
-    solve_with_dom_async = None
+    # Fallback if shared_vision isn't available
+    solve_with_vision = None
+    solve_with_vision_async = None
 
 # Monkey-patch Playwright Page objects with .fallback()
 try:
     from playwright.sync_api import Page as SyncPage
-    if solve_with_dom_sync:
+    if solve_with_vision:
         def _sync_fallback(self, instruction: str):
-            return solve_with_dom_sync(self, instruction)
+            return solve_with_vision(self, instruction)
         SyncPage.fallback = _sync_fallback
 except ImportError:
     pass
 
 try:
     from playwright.async_api import Page as AsyncPage
-    if solve_with_dom_async:
+    if solve_with_vision_async:
         async def _async_fallback(self, instruction: str):
-            return await solve_with_dom_async(self, instruction)
+            return await solve_with_vision_async(self, instruction)
         AsyncPage.fallback = _async_fallback
 except ImportError:
     pass
@@ -103,9 +103,10 @@ class BrowserConfig:
     def launch_args(self) -> list:
         """Combine standard args with mode-specific args and any extras."""
         args = list(BROWSER_LAUNCH_ARGS)
-        # Push browser way off-screen to taskbar so it doesn't annoy user
         if not self.headless:
-            args.append("--window-position=-32000,-32000")
+            # Headful but unobtrusive: start minimized so the automation
+            # browser sits in the taskbar instead of stealing the screen.
+            args.append("--start-minimized")
         args.extend(self.extra_args)
         return args
 
@@ -197,10 +198,32 @@ class AsyncBrowser:
         from playwright.async_api import async_playwright
 
         self._playwright = await async_playwright().__aenter__()
-        self._browser = await self._playwright.chromium.launch(
-            headless=self._config.headless,
-            args=self._config.launch_args(),
-        )
+        
+        # Connect to Windows Edge via CDP to avoid captchas
+        cdp_url = "http://127.0.0.1:9222"
+        try:
+            self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url, timeout=5000)
+        except Exception:
+            print(f"  ⚠ Connection refused. Auto-launching Jarvis Edge on Windows...")
+            import asyncio
+            try:
+                # Kill existing Edge processes before starting a new debugging session
+                kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
+                proc1 = await asyncio.create_subprocess_shell(kill_cmd, stderr=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL)
+                await proc1.communicate()
+                await asyncio.sleep(2)
+                
+                cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
+                proc2 = await asyncio.create_subprocess_shell(cmd)
+                await proc2.communicate()
+                await asyncio.sleep(6) # Wait for Edge to fully open and start CDP server
+                
+                self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url, timeout=10000)
+                print("  ✅ Successfully auto-launched and connected!")
+            except Exception as ex:
+                print(f"  ❌ Auto-launch failed: {ex}")
+                raise
+
         return self
 
     async def __aexit__(self, *exc_info):
@@ -209,7 +232,7 @@ class AsyncBrowser:
         self._contexts.clear()
         await safe_close_async(self._browser)
         if self._playwright:
-            await self._playwright.__aexit__(*exc_info)
+            await self._playwright.stop()
 
     @property
     def browser(self):
@@ -221,6 +244,12 @@ class AsyncBrowser:
             **self._config.context_kwargs(session_path)
         )
         self._contexts.append(ctx)
+
+        # Inject stealth.min.js to bypass Akamai/Cloudflare bot protection
+        stealth_path = Path(__file__).parent / "automations" / "job-automation" / "stealth.min.js"
+        if stealth_path.exists():
+            await ctx.add_init_script(path=str(stealth_path))
+
         return ctx
 
     async def new_context_with_session(
@@ -289,18 +318,37 @@ class SyncBrowser:
 
     def new_context(self, session_path: Optional[Path] = None):
         """Create a new non-persistent context."""
-        use_obscura = os.environ.get("USE_OBSCURA") == "1"
-        if use_obscura:
-            browser = self._playwright.chromium.connect_over_cdp("ws://127.0.0.1:9222")
-            ctx = browser.contexts[0] if browser.contexts else browser.new_context()
-        else:
-            browser = self._playwright.chromium.launch(
-                headless=self._config.headless,
-                args=self._config.launch_args(),
-            )
-            ctx = browser.new_context(
-                **self._config.context_kwargs(session_path)
-            )
+        cdp_url = "http://127.0.0.1:9222"
+        try:
+            browser = self._playwright.chromium.connect_over_cdp(cdp_url, timeout=5000)
+        except Exception:
+            print(f"  ⚠ Connection refused. Auto-launching Jarvis Edge on Windows...")
+            import subprocess
+            import time
+            try:
+                # Kill existing Edge processes before starting a new debugging session
+                kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
+                subprocess.run(kill_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                time.sleep(2)
+                
+                cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
+                subprocess.run(cmd, shell=True)
+                time.sleep(6) # Wait for Edge to fully open and start CDP server
+                
+                browser = self._playwright.chromium.connect_over_cdp(cdp_url, timeout=10000)
+                print("  ✅ Successfully auto-launched and connected!")
+            except Exception as ex:
+                print(f"  ❌ Auto-launch failed: {ex}")
+                raise
+        ctx = browser.new_context(
+            **self._config.context_kwargs(session_path)
+        )
+
+        # Inject stealth.min.js
+        stealth_path = Path(__file__).parent / "automations" / "job-automation" / "stealth.min.js"
+        if stealth_path.exists():
+            ctx.add_init_script(path=str(stealth_path))
+
         # Track both browser and context for cleanup
         self._contexts.append(ctx)
         # We store the browser so we can close it when the context is done
@@ -313,34 +361,30 @@ class SyncBrowser:
         extra_kwargs: Optional[dict] = None,
     ):
         """Launch a persistent context (cookies/cache survive between runs)."""
-        use_obscura = os.environ.get("USE_OBSCURA") == "1"
-        if use_obscura:
-            browser = self._playwright.chromium.connect_over_cdp("ws://127.0.0.1:9222")
-            # Obscura manages its own persistent state when launched with --storage-dir
-            ctx = browser.contexts[0] if browser.contexts else browser.new_context()
-            self._contexts.append(ctx)
-            ctx._jarvis_browser = browser
-            return ctx
-
-        kwargs = {
-            "headless": self._config.headless,
-            **self._config.context_kwargs(),
-        }
-        if extra_kwargs:
-            kwargs.update(extra_kwargs)
-            
-            
-        if not self._config.headless:
-            if 'args' not in kwargs:
-                kwargs['args'] = []
-            # Fix WSLg hidden window bug by forcing it to maximize and removing Playwright's forced viewport
-            kwargs['args'].append('--start-maximized')
-            kwargs['no_viewport'] = True
-            
-        ctx = self._playwright.chromium.launch_persistent_context(
-            user_data_dir=str(user_data_dir),
-            **kwargs,
-        )
+        cdp_url = "http://127.0.0.1:9222"
+        try:
+            self._browser = self._playwright.chromium.connect_over_cdp(cdp_url, timeout=5000)
+        except Exception:
+            print(f"  ⚠ Connection refused. Auto-launching Jarvis Edge on Windows...")
+            import subprocess
+            import time
+            try:
+                # Kill existing Edge processes before starting a new debugging session
+                kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
+                subprocess.run(kill_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                time.sleep(2)
+                
+                cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
+                subprocess.run(cmd, shell=True)
+                time.sleep(6) # Wait for Edge to fully open and start CDP server
+                
+                self._browser = self._playwright.chromium.connect_over_cdp(cdp_url, timeout=10000)
+                print("  ✅ Successfully auto-launched and connected!")
+            except Exception as ex:
+                print(f"  ❌ Auto-launch failed: {ex}")
+                raise
+                
+        ctx = self._browser.contexts[0] if self._browser.contexts else self._browser.new_context()
         self._contexts.append(ctx)
         return ctx
 

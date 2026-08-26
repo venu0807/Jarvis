@@ -1,9 +1,5 @@
 version: '3.8'
-
 services:
-  # ============================================================
-  # Database
-  # ============================================================
   postgres:
     image: postgres:16-alpine
     container_name: jarvis-postgres
@@ -12,21 +8,19 @@ services:
       POSTGRES_USER: jarvis
       POSTGRES_PASSWORD: ${JARVIS_DB_PASS:-jarvis}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
+    - postgres_data:/var/lib/postgresql/data
+    - ./init-scripts:/docker-entrypoint-initdb.d
     ports:
-      - "5432:5432"
+    - 5432:5432
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U jarvis -d jarvis
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - jarvis-network
-
-  # ============================================================
-  # Automations
-  # ============================================================
+    - jarvis-network
   job-automation:
     build:
       context: ./automations/job-automation
@@ -34,17 +28,16 @@ services:
     container_name: jarvis-job-auto
     env_file: ./automations/job-automation/.env
     environment:
-      - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS:-jarvis}@postgres:5432/jarvis
-      - OLLAMA_HOST=http://host.docker.internal:11434
+    - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS:-jarvis}@postgres:5432/jarvis
+    - OLLAMA_HOST=http://host.docker.internal:11434
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "8001:8000"
+    - 8001:8000
     networks:
-      - jarvis-network
+    - jarvis-network
     restart: unless-stopped
-
   pinterest:
     build:
       context: ./automations/pinterest
@@ -52,115 +45,76 @@ services:
     container_name: jarvis-pinterest
     env_file: ./automations/pinterest/.env
     environment:
-      - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS:-jarvis}@postgres:5432/jarvis
-      - OLLAMA_HOST=http://host.docker.internal:11434
+    - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS:-jarvis}@postgres:5432/jarvis
+    - OLLAMA_HOST=http://host.docker.internal:11434
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "8002:8000"
+    - 8002:8000
     networks:
-      - jarvis-network
+    - jarvis-network
     restart: unless-stopped
-
   model-router:
     build:
       context: ./automations/model-router
       dockerfile: Dockerfile
     container_name: jarvis-model-router
     environment:
-      - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS:-jarvis}@postgres:5432/jarvis
-      - OLLAMA_HOST=http://host.docker.internal:11434
-      - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-changeme}
+    - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS:-jarvis}@postgres:5432/jarvis
+    - OLLAMA_HOST=http://host.docker.internal:11434
+    - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-changeme}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "8003:8000"
+    - 8003:8000
     networks:
-      - jarvis-network
+    - jarvis-network
     restart: unless-stopped
-
-  # ============================================================
-  # Observability
-  # ============================================================
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: jarvis-prometheus
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/rules:/etc/prometheus/rules:ro
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-    ports:
-      - "9090:9090"
-    depends_on:
-      - job-automation
-      - pinterest
-      - model-router
-    networks:
-      - jarvis-network
-    restart: unless-stopped
-
   grafana:
     image: grafana/grafana:latest
     container_name: jarvis-grafana
     environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASS:-admin}
-      - GF_USERS_ALLOW_SIGN_UP=false
+    - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+    - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASS:-admin}
+    - GF_USERS_ALLOW_SIGN_UP=false
+    dns:
+    - 8.8.8.8
+    - 1.1.1.1
     volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    - grafana_data:/var/lib/grafana
+    - ./grafana/plugins:/var/lib/grafana/plugins
+    - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+    - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    - ./automations/job-automation/output:/var/lib/grafana/job_data
+    - ./automations:/var/lib/grafana/automations
+    - ./automations/linkedin-outreach:/var/lib/grafana/outreach_data
     ports:
-      - "3001:3000"
-    depends_on:
-      - prometheus
+    - 3001:3000
     networks:
-      - jarvis-network
+    - jarvis-network
     restart: unless-stopped
-
-  alertmanager:
-    image: prom/alertmanager:latest
-    container_name: jarvis-alertmanager
-    volumes:
-      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-    ports:
-      - "9093:9093"
-    networks:
-      - jarvis-network
-    restart: unless-stopped
-
-  # ============================================================
-  # Dashboard (when present)
-  # ============================================================
   dashboard:
-    profiles: ["with-dashboard"]  # opt-in via: docker compose --profile with-dashboard up
+    profiles:
+    - with-dashboard
     build:
       context: ./automations/dashboard-nextjs
       dockerfile: Dockerfile
     container_name: jarvis-dashboard
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8003
+    - NEXT_PUBLIC_API_URL=http://localhost:8003
     ports:
-      - "3000:3000"
+    - 3000:3000
     depends_on:
-      - model-router
+    - model-router
     networks:
-      - jarvis-network
+    - jarvis-network
     restart: unless-stopped
-
 networks:
   jarvis-network:
     driver: bridge
-
 volumes:
-  postgres_data:
-  prometheus_data:
-  grafana_data:
+  postgres_data: null
+  grafana_data: null

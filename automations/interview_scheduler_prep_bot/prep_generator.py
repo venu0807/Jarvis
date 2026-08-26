@@ -1,31 +1,24 @@
 """
 prep_generator.py — Generate interview prep sheets via JARVIS policy.
-
-Routed through ~/.jarvis/policy.call_llm() (mode="run") so the call is
-audit-logged and PII detection runs even though the local model is already
-the default. The prompt contains a JD snippet sourced from the local SQLite
-DB which may contain user-applied job info — keep it policy-routed.
+Upgraded with fuzzy company matching, JD discovery, and news fetching.
 """
 
 import sqlite3
 import os
 import sys
+import re
 import requests
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 # Route via JARVIS chokepoint.
 try:
-    # Resolve project root relative to this script — always correct.
     JARVIS_HOME = str(Path(__file__).resolve().parent.parent.parent)
     if JARVIS_HOME not in sys.path:
         sys.path.insert(0, JARVIS_HOME)
     from policy import call_llm   # type: ignore
-except Exception as e:  # pragma: no cover
-    raise SystemExit(
-        f"FATAL: prep_generator cannot import ~/.jarvis/policy: {e!r}. "
-        "Refusing direct ollama — strict-zero-leak requires policy audit log."
-    )
+except Exception as e:
+    raise SystemExit(f"FATAL: prep_generator cannot import ~/.jarvis/policy: {e!r}.")
 
 DB_PATH = Path(__file__).parent.parent / "job-automation" / "output" / "jobs.db"
 PREP_DIR = Path(__file__).parent / "prep_sheets"
@@ -33,7 +26,9 @@ PREP_DIR = Path(__file__).parent / "prep_sheets"
 def get_company_news(company_name: str) -> str:
     print(f"  📰 Fetching real-time news for {company_name}...")
     try:
-        url = f"https://news.google.com/rss/search?q={company_name}+business+OR+tech"
+        # Strip legal suffixes for news search
+        clean_name = re.sub(r'(?i)\b(edutech|pvt|ltd|private|limited|technologies|tech|solutions|services|llp|inc|corp)\b', '', company_name).strip()
+        url = f"https://news.google.com/rss/search?q={clean_name or company_name}+business+OR+tech"
         res = requests.get(url, timeout=10)
         if res.status_code == 200:
             root = ET.fromstring(res.text)
@@ -41,7 +36,6 @@ def get_company_news(company_name: str) -> str:
             for item in root.findall(".//item")[:4]:
                 title = item.find("title").text
                 pubDate = item.find("pubDate").text
-                # Remove the generic source name from the end if present
                 if " - " in title:
                     title = title.rsplit(" - ", 1)[0]
                 news_items.append(f"  - {title} ({pubDate})")
@@ -51,67 +45,65 @@ def get_company_news(company_name: str) -> str:
         print(f"  ⚠️ Could not fetch news: {e}")
     return "  - No recent news found."
 
-def generate_prep_sheet(company_name: str, interview_date: str = "Unknown") -> str:
+def fetch_job_description(company_name: str) -> tuple[str, str]:
+    """Fuzzy search jobs.db for the matching company and job description."""
+    if not DB_PATH.exists():
+        return "Software Developer", ""
+    
+    clean_comp = re.sub(r'(?i)\b(edutech|pvt|ltd|private|limited|technologies|tech|solutions|services|llp|inc|corp)\b', '', company_name).strip()
+    clean_comp = re.sub(r'\s+', ' ', clean_comp).strip()
+    first_word = clean_comp.split()[0] if clean_comp else company_name
+
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            # 1. Exact match or broad match
+            cur = conn.execute(
+                "SELECT title, description FROM jobs WHERE company LIKE ? OR company LIKE ? ORDER BY id DESC LIMIT 1",
+                (f"%{clean_comp}%", f"%{first_word}%")
+            )
+            row = cur.fetchone()
+            if row:
+                return row[0], row[1]
+    except Exception as e:
+        print(f"  ⚠️ DB Query error: {e}")
+    
+    return "Developer", ""
+
+def generate_prep_sheet(company_name: str, interview_date: str = "Upcoming") -> str:
     print(f"🧠 Generating AI Prep Sheet for {company_name}...")
     PREP_DIR.mkdir(parents=True, exist_ok=True)
     
     real_time_news = get_company_news(company_name)
+    job_title, jd_text = fetch_job_description(company_name)
     
-    # 1. Fetch JD from DB
-    jd_text = ""
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            # Look for jobs matching the company name
-            cur = conn.execute("SELECT title, description FROM jobs WHERE company LIKE ? LIMIT 1", (f"%{company_name}%",))
-            row = cur.fetchone()
-            if row:
-                job_title, jd_text = row
-                print(f"  ✅ Found JD: {job_title} @ {company_name}")
-            else:
-                print(f"  ⚠️ JD not found for {company_name}. Using generic prep.")
-                job_title = "Unknown Role"
-    except Exception as e:
-        print(f"  ❌ DB Error: {e}")
-        return ""
+    if jd_text:
+        print(f"  ✅ Found JD: {job_title} @ {company_name}")
+    else:
+        print(f"  ⚠️ JD not found for {company_name}. Generating tailored developer prep.")
 
-    # 2. Prompt JARVIS policy
-    # Prompt tuned 2026-06-15: the original verbose template routinely hit
-    # ollama's response generation past the 120s budget for unknown JDs.
-    # Trimmed to ~50% the words and explicit 240s timeout so:
-    #   * known-JD company → ~13s (unchanged, was already fast)
-    #   * unknown-JD fallback → still finishes inside 240s
-    # The lower num_predict cap on the local call matches phi4-mini's sweet
-    # spot for structured markdown of this size (5 tech + 3 STAR questions).
     prompt = f"""You are an elite Silicon Valley interview coach.
-I have an interview with {company_name} coming up on {interview_date}.
+I have an interview with {company_name} for the role of "{job_title}" coming up on {interview_date}.
 
 Below is the Job Description for the role I applied for:
 ---
-{jd_text}
+{jd_text or 'Junior / Fresher Software & Web Developer role focusing on Python, Django, React, HTML, CSS, JavaScript, and backend APIs.'}
 ---
 
-Here is the real-time news and latest developments about {company_name} from this week:
+Here is the real-time news and latest developments about {company_name}:
 ---
 {real_time_news}
 ---
 
-Based on the JD and the real-time news, generate a concise, highly strategic 1-page "Cheat Sheet" for me to read 15 minutes before the interview. 
+Generate a concise, highly strategic 1-page "Cheat Sheet" for me to read 15 minutes before the interview:
+1. **The Core Mission**: 1-sentence summary of what this role does and how it impacts the business.
+2. **Top 3 Technical Focus Areas**: The 3 most critical skills to demonstrate (with specific talking points).
+3. **Behavioral Angles**: 2 traits they are looking for (e.g. adaptability, initiative, problem solving).
+4. **"Insider" Questions to Ask Them**: 3 brilliant, thoughtful questions to ask the interviewer.
 
-Your cheat sheet MUST include:
-1. **The Core Mission**: 1 sentence summary of what this role actually does based on the JD.
-2. **Top 3 Technical Focus Areas**: What they care about most technically.
-3. **Behavioral Angles**: 2 traits they are looking for based on the JD's tone.
-4. **"Insider" Questions to Ask Them**: Give me 3 brilliant questions to ask the interviewer at the end. Use the Real-Time News provided above to make at least one question hyper-specific to their current business challenges (e.g., mentioning a recent product launch or market shift).
-
-Format using clean Markdown, bold headers, and bullet points. Be extremely concise. No fluff.
+Format using clean Markdown, bold headers, and bullet points. Be extremely concise.
 """
 
     try:
-        # Route through JARVIS policy so this call is audit-logged.
-        # mode="run" + pii_acknowledged=True because the JD snippet may
-        # contain applied-job-bodies that include company-specific PII.
-        # timeout_s=240 handles unknown-JD prompts that the trimmed
-        # template still occasionally generates past 120s.
         result = call_llm(
             prompt=prompt,
             mode="run",
@@ -121,25 +113,16 @@ Format using clean Markdown, bold headers, and bullet points. Be extremely conci
             timeout_s=240,
         )
         md_content = result.text
-
-        # Detect timeout-fallback (call_llm returns empty text + audit-logged
-        # ollama_timeout when timeout exceeded). Don't write an empty file;
-        # surface the failure cleanly so the caller knows to retry or skip.
         if not md_content:
-            print(
-                f"  ⏱  prep_sheet:{company_name} timed out after the budget. "
-                f"See ~/.jarvis/audit.log for the ollama_timeout event. "
-                f"Not writing an empty prep file."
-            )
+            print(f"  ⏱ prep_sheet:{company_name} timed out or returned empty.")
             return ""
 
-        # 3. Save to file
-        safe_name = company_name.replace(" ", "_").lower()
+        safe_name = re.sub(r'[^a-zA-Z0-9]', '_', company_name).lower()
         file_path = PREP_DIR / f"{safe_name}_prep_sheet.md"
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(md_content)
 
-        print(f"  ✅ Prep Sheet saved -> {file_path} (via {result.model}, {result.provider})")
+        print(f"  ✅ Prep Sheet saved -> {file_path}")
         return str(file_path)
     except Exception as e:
         print(f"  ❌ Ollama generation failed: {e}")
@@ -147,4 +130,4 @@ Format using clean Markdown, bold headers, and bullet points. Be extremely conci
     return ""
 
 if __name__ == "__main__":
-    generate_prep_sheet("Scoutit")
+    generate_prep_sheet("Uncodemy", "2026-08-27")

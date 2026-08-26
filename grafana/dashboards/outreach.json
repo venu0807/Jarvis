@@ -1,0 +1,70 @@
+{
+    "title": "LinkedIn Outreach",
+    "uid": "outreach-dashboard-01",
+    "refresh": "1m",
+    "panels": [
+        {
+            "type": "stat",
+            "title": "Total Sent Emails",
+            "gridPos": {
+                "x": 0,
+                "y": 0,
+                "w": 8,
+                "h": 6
+            },
+            "datasource": {
+                "type": "postgres",
+                "uid": "postgres_outreach_uid"
+            },
+            "targets": [
+                {
+                    "rawSql": "SELECT COUNT(*) FROM sent_emails",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "type": "stat",
+            "title": "Replies Received",
+            "gridPos": {
+                "x": 8,
+                "y": 0,
+                "w": 8,
+                "h": 6
+            },
+            "datasource": {
+                "type": "postgres",
+                "uid": "postgres_outreach_uid"
+            },
+            "targets": [
+                {
+                    "rawSql": "SELECT COUNT(*) FROM replies",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "type": "stat",
+            "title": "Pending Followups",
+            "gridPos": {
+                "x": 16,
+                "y": 0,
+                "w": 8,
+                "h": 6
+            },
+            "datasource": {
+                "type": "postgres",
+                "uid": "postgres_outreach_uid"
+            },
+            "targets": [
+                {
+                    "rawSql": "SELECT COUNT(*) FROM followups WHERE status = 'pending'",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ]
+        }
+    ]
+}

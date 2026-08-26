@@ -20,10 +20,12 @@ sleep 3
 su - venu -c "nohup /usr/local/bin/ollama serve > /dev/null 2>&1 &"
 
 # 2. Start Next.js dashboard (runs as venu)
-su - venu -c "cd /home/venu/Proposals/Jarvis/automations/dashboard-nextjs && nohup /usr/bin/npm start > /dev/null 2>&1 &"
+su - venu -c "pm2 resurrect"  # Restores jarvis-dashboard and any other PM2 processes
 
 # 3. Start Email Listener (runs as venu)
-su - venu -c "cd /home/venu/Proposals/Jarvis/automations/interview_scheduler_prep_bot && source venv/bin/activate && nohup python3 email_listener.py > /dev/null 2>&1 &"
+# 3. Systemd Services (runs as root)
+service jarvis-email-monitor start 2>/dev/null
+service buzz-jarvis-interview-listener start 2>/dev/null
 
 # 4. Start n8n Workflow Automation (runs as venu)
 su - venu -c "nohup /usr/local/bin/n8n start > /dev/null 2>&1 &"

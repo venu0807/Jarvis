@@ -37,10 +37,6 @@ from __future__ import annotations
 
 import os
 import sys
-
-# Force Playwright to use the native Google Chrome instead of the broken Snap Chromium
-if os.path.exists("/usr/bin/google-chrome"):
-    os.environ["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"] = "/usr/bin/google-chrome"
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -202,10 +198,32 @@ class AsyncBrowser:
         from playwright.async_api import async_playwright
 
         self._playwright = await async_playwright().__aenter__()
-        self._browser = await self._playwright.chromium.launch(
-            headless=self._config.headless,
-            args=self._config.launch_args(),
-        )
+        
+        # Connect to Windows Edge via CDP to avoid captchas
+        cdp_url = "http://127.0.0.1:9222"
+        try:
+            self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url, timeout=5000)
+        except Exception:
+            print(f"  ⚠ Connection refused. Auto-launching Jarvis Edge on Windows...")
+            import asyncio
+            try:
+                # Kill existing Edge processes before starting a new debugging session
+                kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
+                proc1 = await asyncio.create_subprocess_shell(kill_cmd, stderr=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL)
+                await proc1.communicate()
+                await asyncio.sleep(2)
+                
+                cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
+                proc2 = await asyncio.create_subprocess_shell(cmd)
+                await proc2.communicate()
+                await asyncio.sleep(6) # Wait for Edge to fully open and start CDP server
+                
+                self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url, timeout=10000)
+                print("  ✅ Successfully auto-launched and connected!")
+            except Exception as ex:
+                print(f"  ❌ Auto-launch failed: {ex}")
+                raise
+
         return self
 
     async def __aexit__(self, *exc_info):
@@ -220,35 +238,81 @@ class AsyncBrowser:
     def browser(self):
         return self._browser
 
-    async def new_context(self, session_path: Optional[Path] = None) -> object:
-        """Create a new context, optionally loading a saved session."""
-        ctx = await self._browser.new_context(
-            **self._config.context_kwargs(session_path)
-        )
-        self._contexts.append(ctx)
+    async def ensure_connected(self):
+        """Ensure CDP connection to Windows Edge is active. Reconnect or re-launch if dropped."""
+        cdp_url = "http://127.0.0.1:9222"
+        if self._browser is not None:
+            try:
+                if self._browser.is_connected() and len(self._browser.contexts) > 0:
+                    return
+            except Exception:
+                pass
 
-        # Inject stealth.min.js to bypass Akamai/Cloudflare bot protection
+        # If disconnected, attempt reconnect
+        try:
+            self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url, timeout=4000)
+            return
+        except Exception:
+            pass
+
+        # Auto-launch Edge on Windows if not running
+        import asyncio
+        print("  🔄 Re-connecting to Jarvis Edge on Windows...")
+        try:
+            cmd = r'''/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' -ArgumentList '--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\JarvisEdgeProfile'"'''
+            proc = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+            await proc.communicate()
+            await asyncio.sleep(4)
+            self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url, timeout=10000)
+        except Exception as e:
+            print(f"  ⚠️ Could not re-connect to Edge: {e}")
+
+    async def new_context(self, session_path: Optional[Path] = None) -> object:
+        """Use the default context to prevent multiple windows from opening, with auto-recovery."""
+        await self.ensure_connected()
+        
+        ctx = None
+        if self._browser and self._browser.contexts:
+            ctx = self._browser.contexts[0]
+            # Override close on default context to prevent closing Edge entirely
+            async def dummy_close(*args, **kwargs): pass
+            ctx.close = dummy_close
+        elif self._browser:
+            try:
+                ctx = await self._browser.new_context(**self._config.context_kwargs(session_path))
+            except Exception:
+                await self.ensure_connected()
+                if self._browser and self._browser.contexts:
+                    ctx = self._browser.contexts[0]
+
+        if ctx and ctx not in self._contexts:
+            self._contexts.append(ctx)
+
+        # Inject stealth.min.js to bypass bot protection
         stealth_path = Path(__file__).parent / "automations" / "job-automation" / "stealth.min.js"
-        if stealth_path.exists():
-            await ctx.add_init_script(path=str(stealth_path))
+        if ctx and stealth_path.exists():
+            try:
+                await ctx.add_init_script(path=str(stealth_path))
+            except Exception:
+                pass
 
         return ctx
 
     async def new_context_with_session(
         self, session_path: Path
     ) -> object:
-        """Alias: create context and log session loading."""
-        if session_path.exists():
-            print(f"\n💾 Loading saved session from {session_path.name}")
+        """Alias: return default context and ignore session loading since default context already has cookies."""
         return await self.new_context(session_path)
 
     async def save_session(self, context, session_path: Path) -> None:
-        """Persist the context's storage_state to disk."""
+        """Persist session safely without crashing on CDP protocol variances."""
         try:
-            await context.storage_state(path=str(session_path))
-            print(f"  💾 Session saved → {session_path.name}")
-        except Exception as e:
-            print(f"  ⚠️  Could not save session: {e}")
+            if context and hasattr(context, "storage_state"):
+                await context.storage_state(path=str(session_path))
+                print(f"  💾 Session saved → {session_path.name}")
+        except Exception:
+            # In CDP mode against persistent Edge profile, cookies are already saved to C:\JarvisEdgeProfile
+            pass
 
     def track_context(self, context) -> object:
         """Manually track a context for cleanup in __aexit__."""
@@ -300,10 +364,28 @@ class SyncBrowser:
 
     def new_context(self, session_path: Optional[Path] = None):
         """Create a new non-persistent context."""
-        browser = self._playwright.chromium.launch(
-            headless=self._config.headless,
-            args=self._config.launch_args(),
-        )
+        cdp_url = "http://127.0.0.1:9222"
+        try:
+            browser = self._playwright.chromium.connect_over_cdp(cdp_url, timeout=5000)
+        except Exception:
+            print(f"  ⚠ Connection refused. Auto-launching Jarvis Edge on Windows...")
+            import subprocess
+            import time
+            try:
+                # Kill existing Edge processes before starting a new debugging session
+                kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
+                subprocess.run(kill_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                time.sleep(2)
+                
+                cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
+                subprocess.run(cmd, shell=True)
+                time.sleep(6) # Wait for Edge to fully open and start CDP server
+                
+                browser = self._playwright.chromium.connect_over_cdp(cdp_url, timeout=10000)
+                print("  ✅ Successfully auto-launched and connected!")
+            except Exception as ex:
+                print(f"  ❌ Auto-launch failed: {ex}")
+                raise
         ctx = browser.new_context(
             **self._config.context_kwargs(session_path)
         )
@@ -325,23 +407,35 @@ class SyncBrowser:
         extra_kwargs: Optional[dict] = None,
     ):
         """Launch a persistent context (cookies/cache survive between runs)."""
-        kwargs = {
-            "headless": self._config.headless,
-            **self._config.context_kwargs(),
-        }
-        if extra_kwargs:
-            kwargs.update(extra_kwargs)
-            
-        if not self._config.headless:
-            if 'args' not in kwargs:
-                kwargs['args'] = []
-            kwargs['args'].append('--start-maximized')
-            kwargs['no_viewport'] = True
-            
-        ctx = self._playwright.chromium.launch_persistent_context(
-            user_data_dir=str(user_data_dir),
-            **kwargs,
-        )
+        cdp_url = "http://127.0.0.1:9222"
+        try:
+            self._browser = self._playwright.chromium.connect_over_cdp(cdp_url, timeout=5000)
+        except Exception:
+            print(f"  ⚠ Connection refused. Auto-launching Jarvis Edge on Windows...")
+            import subprocess
+            import time
+            try:
+                # Kill existing Edge processes before starting a new debugging session
+                kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
+                subprocess.run(kill_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                time.sleep(2)
+                
+                cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
+                subprocess.run(cmd, shell=True)
+                time.sleep(6) # Wait for Edge to fully open and start CDP server
+                
+                self._browser = self._playwright.chromium.connect_over_cdp(cdp_url, timeout=10000)
+                print("  ✅ Successfully auto-launched and connected!")
+            except Exception as ex:
+                print(f"  ❌ Auto-launch failed: {ex}")
+                raise
+                
+        if self._browser.contexts:
+            ctx = self._browser.contexts[0]
+            # Prevent safe_close_sync from closing the user's main browser window
+            ctx.close = lambda *args, **kwargs: None
+        else:
+            ctx = self._browser.new_context()
         self._contexts.append(ctx)
         return ctx
 

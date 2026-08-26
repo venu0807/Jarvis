@@ -71,7 +71,7 @@ class FounditPortal(BasePortal):
                 print(f"\n  🔍 Foundit: Searching for '{role}' in '{city}'")
                 try:
                     # Navigate to search URL
-                    search_url = f"{self.base_url}/srp/results?query={role.replace(' ', '%20')}&locations={city.replace(' ', '%20')}"
+                    search_url = f"{self.base_url}/srp/results?query={role.replace(' ', '%20')}&locations={city.replace(' ', '%20')}&experienceRanges=0~0&experience=0"
                     await page.goto(search_url, timeout=60000)
                     await page.wait_for_timeout(4000)
                     
@@ -115,8 +115,12 @@ class FounditPortal(BasePortal):
                             "portal": self.name,
                         }
 
-                        if is_experienced_role(title, ""):
-                            print(f"     ⏭️  Skipped: Requires experience (not fresher/intern)")
+                        # Extract full card snippet/details for experience filtering
+                        card_text = (await card.inner_text() or "").strip()
+                        job["description"] = card_text
+
+                        if is_experienced_role(title, card_text):
+                            print(f"     ⏭️  Skipped: Requires experience (not fresher/intern): {title}")
                             continue
 
                         # Apply flow: click the card to open the detail panel,
@@ -136,8 +140,52 @@ class FounditPortal(BasePortal):
                                 print(f"     ⚠️  Foundit: applyNowBtn missing")
                                 results.append(ApplicationResult(job, "manual", "Apply Now button missing"))
                             else:
+                                # Verify panel text does not require senior experience
+                                panel_text = (await panel.inner_text() or "").strip()
+                                if is_experienced_role(title, panel_text):
+                                    print(f"     ⏭️  Skipped: Requires experience (found in detail panel): {title}")
+                                    results.append(ApplicationResult(job, "skipped", "Requires experience (not fresher/intern)"))
+                                    continue
                                 await apply_btn.click()
-                                await page.wait_for_timeout(4000)
+                                await page.wait_for_timeout(3000)
+
+                                # Check if a questionnaire or confirmation popup appears
+                                try:
+                                    modal = page.locator(".modal-content, [class*='modal'], [class*='popup'], [class*='dialog'], .questionnaire-container").first
+                                    if await modal.is_visible(timeout=1500):
+                                        # Fill text inputs
+                                        inputs = await modal.locator("input[type='text'], input[type='number']").all()
+                                        for inp in inputs:
+                                            try:
+                                                if await inp.is_visible() and not await inp.input_value():
+                                                    ph = (await inp.get_attribute("placeholder") or "").lower()
+                                                    name = (await inp.get_attribute("name") or "").lower()
+                                                    combined = ph + " " + name
+                                                    if "experience" in combined or "year" in combined:
+                                                        await inp.fill("0")
+                                                    elif "expected" in combined or "salary" in combined or "ctc" in combined:
+                                                        await inp.fill("4" if "lac" in combined or "lpa" in combined else "400000")
+                                                    elif "degree" in combined or "education" in combined:
+                                                        await inp.fill("MCA")
+                                                    elif "notice" in combined:
+                                                        await inp.fill("Immediate")
+                                                    else:
+                                                        await inp.fill("Yes")
+                                            except:
+                                                continue
+                                        
+                                        # Click submit in modal
+                                        for btn_sel in ["button:has-text('Submit')", "button:has-text('Apply')", "button:has-text('Continue')", "button[type='submit']"]:
+                                            try:
+                                                submit_btn = modal.locator(btn_sel).first
+                                                if await submit_btn.is_visible(timeout=500):
+                                                    await submit_btn.click()
+                                                    await page.wait_for_timeout(2000)
+                                                    break
+                                            except:
+                                                continue
+                                except:
+                                    pass
 
                                 # Success check — handled in modal/snackbar post-click.
                                 body_text = (await page.locator("body").inner_text()).lower()

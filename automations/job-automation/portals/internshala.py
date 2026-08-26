@@ -134,6 +134,21 @@ class InternshalaPortal(BasePortal):
                     job_id_attr = await card.get_attribute("internshipid") or await card.get_attribute("jobid")
                     job_id = f"internshala_{job_id_attr}" if job_id_attr else f"internshala_{href.split('-')[-1]}"
                     
+                    
+                    # ── Role relevance filter ────────────────────────────
+                    all_keywords = set()
+                    for r in roles:
+                        for w in r.split():
+                            if len(w) > 3:
+                                all_keywords.add(w.lower())
+                    
+                    title_lower = title.strip().lower()
+                    if all_keywords and not any(kw in title_lower for kw in all_keywords):
+                        # Still allow "Software Engineer" / "Data" generic roles on Internshala
+                        if "software" not in title_lower and "data" not in title_lower and "developer" not in title_lower:
+                            print(f"     ⏩ Skipping unrelated: {title}")
+                            continue
+
                     jobs_found.append({
                         "id": job_id,
                         "title": title.strip(),
@@ -148,8 +163,11 @@ class InternshalaPortal(BasePortal):
                     
             print(f"  🔍 Internshala: Found {len(jobs_found)} recommended jobs matching preferences")
             
-            for job in jobs_found:
-                if applied >= limit: break
+            queue = jobs_found.copy()
+            visited = set(job["id"] for job in queue)
+            
+            while queue and applied < limit:
+                job = queue.pop(0)
                 if job["id"] in applied_today:
                     print(f"     ⏭️  Already applied: {job['title']}")
                     continue
@@ -163,6 +181,25 @@ class InternshalaPortal(BasePortal):
                 try:
                     # Use new page for apply to preserve search results
                     apply_page = await page.context.new_page()
+                    
+                    # Open page and extract similar jobs before applying
+                    try:
+                        await apply_page.goto(job["url"], wait_until="domcontentloaded", timeout=TIMEOUT)
+                        await apply_page.wait_for_timeout(2000)
+                        
+                        # Dynamically find similar jobs
+                        similar_jobs = await self.extract_similar_jobs(apply_page, roles)
+                        new_jobs = 0
+                        for s_job in similar_jobs:
+                            if s_job["id"] not in visited:
+                                visited.add(s_job["id"])
+                                queue.append(s_job)
+                                new_jobs += 1
+                        if new_jobs > 0:
+                            print(f"     🔍 Found {new_jobs} similar jobs on page. Added to queue.")
+                    except:
+                        pass
+                        
                     result = await self.apply_to_job(apply_page, job)
                     
                     try: await apply_page.close()
@@ -183,12 +220,48 @@ class InternshalaPortal(BasePortal):
                 except Exception as e:
                     print(f"     ⚠️  Apply error: {e}")
                     
-                await page.wait_for_timeout(random.uniform(2000, 4000))
-
         except Exception as ex:
             print(f"  ❌ Internshala search: {str(ex)[:80]}")
 
         return results
+
+    async def extract_similar_jobs(self, page: Page, roles: list) -> list:
+        similar = []
+        try:
+            cards = await page.locator(".similar_internships .individual_internship, .similar-jobs-container .job-card").all()
+            for card in cards:
+                try:
+                    title_el = card.locator("a.job-title-href, .job-internship-name a, .heading_4_5 a").first
+                    if not await title_el.is_visible(timeout=500): continue
+                    title = await title_el.inner_text()
+                    href = await title_el.get_attribute("href")
+                    if not href.startswith("http"): href = "https://internshala.com" + href
+                    company = await card.locator(".company-name, .company_name").first.inner_text()
+                    
+                    job_id_attr = await card.get_attribute("internshipid") or await card.get_attribute("jobid")
+                    job_id = f"internshala_{job_id_attr}" if job_id_attr else f"internshala_{href.split('-')[-1]}"
+                    
+                    # Strict role filter
+                    all_keywords = set(w.lower() for r in roles for w in r.split() if len(w) > 3)
+                    title_lower = title.strip().lower()
+                    if all_keywords and not any(kw in title_lower for kw in all_keywords):
+                        if "software" not in title_lower and "data" not in title_lower and "developer" not in title_lower:
+                            continue
+                            
+                    similar.append({
+                        "id": job_id,
+                        "title": title.strip(),
+                        "company": company.strip(),
+                        "url": href,
+                        "portal": "Internshala",
+                        "location": "Preferences",
+                        "description": ""
+                    })
+                except:
+                    pass
+        except:
+            pass
+        return similar
 
     async def apply_to_job(self, page: Page, job: dict) -> ApplicationResult:
         try:
@@ -202,6 +275,13 @@ class InternshalaPortal(BasePortal):
                     job["description"] = (await desc_el.text_content()).strip()
             except:
                 pass
+            
+            if not job.get("description", "").strip():
+                job["description"] = job.get("title", "")
+
+            # --- Filter by Experience (with description) ---
+            if is_experienced_role(job.get("title", ""), job.get("description", "")):
+                return ApplicationResult(job=job, status="skipped", reason="Requires experience (not fresher/intern)")
 
             # Already applied? (button flips to "Applied" / "Status: Applied")
             try:
@@ -286,6 +366,8 @@ class InternshalaPortal(BasePortal):
                                 combined = ph + " " + label
                                 if "experience" in combined or "year" in combined:
                                     await inp.fill("0")
+                                elif "expected" in combined or "desired" in combined:
+                                    await inp.fill("4" if "lac" in combined or "lpa" in combined else "400000")
                                 elif "ctc" in combined or "salary" in combined or "income" in combined:
                                     await inp.fill("0")
                                 elif "degree" in combined or "education" in combined or "qualification" in combined:

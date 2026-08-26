@@ -217,9 +217,11 @@ class IndeedPortal(BasePortal):
 
                     print(f"  🔍 Indeed: {len(job_data)} jobs for '{role}' in {city}")
 
-                    for jd in job_data:
-                        if applied >= daily_limit:
-                            break
+                    queue = job_data.copy()
+                    visited = set(jd.get("jk", "").strip() for jd in queue)
+
+                    while queue and applied < daily_limit:
+                        jd = queue.pop(0)
 
                         jk      = jd.get("jk", "").strip()
                         title   = jd.get("title", "").strip()
@@ -267,6 +269,23 @@ class IndeedPortal(BasePortal):
                         # the apply flow does (navigate, popup, iframe, etc.)
                         apply_page = await page.context.new_page()
                         try:
+                            # Pre-visit to extract similar jobs
+                            try:
+                                await apply_page.goto(href, wait_until="domcontentloaded", timeout=TIMEOUT)
+                                await apply_page.wait_for_timeout(2000)
+                                similar_jobs = await self.extract_similar_jobs(apply_page, roles, city)
+                                new_jobs = 0
+                                for s_job in similar_jobs:
+                                    s_jk = s_job.get("jk", "").strip()
+                                    if s_jk and s_jk not in visited:
+                                        visited.add(s_jk)
+                                        queue.append(s_job)
+                                        new_jobs += 1
+                                if new_jobs > 0:
+                                    print(f"     🔍 Found {new_jobs} similar jobs on page. Added to queue.")
+                            except Exception:
+                                pass
+
                             result = await self.apply_to_job(apply_page, job)
                         except Exception as ex:
                             result = ApplicationResult(job=job, status="error",
@@ -303,6 +322,42 @@ class IndeedPortal(BasePortal):
 
     # ── Apply ─────────────────────────────────────────────────────────────────
 
+    async def extract_similar_jobs(self, page: Page, roles: list, city: str) -> list:
+        similar = []
+        try:
+            job_data = await page.evaluate("""() => {
+                const out = [];
+                const BASE = 'https://in.indeed.com';
+                const cards = document.querySelectorAll('#relatedJobs .jobsearch-SerpJobCard, .jobsearch-RelatedJobs-list li');
+                cards.forEach(card => {
+                    const anchor = card.querySelector('a[href*="/rc/clk"], a[href*="/viewjob"]');
+                    if (!anchor) return;
+                    const href = anchor.href;
+                    const jkMatch = href.match(/jk=([a-zA-Z0-9]+)/);
+                    const jk = jkMatch ? jkMatch[1] : (card.getAttribute('data-jk') || null);
+                    if (!jk) return;
+
+                    const titleEl = card.querySelector('.jobTitle, .title, .jobsearch-RelatedJobs-title');
+                    const title = titleEl ? titleEl.innerText.trim() : anchor.innerText.trim();
+                    const compEl = card.querySelector('.companyName, .company');
+                    const company = compEl ? compEl.innerText.trim() : 'Unknown';
+
+                    out.push({ jk, title, company, url: href || (BASE + '/viewjob?jk=' + jk) });
+                });
+                return out;
+            }""")
+
+            for jd in job_data:
+                title = jd.get("title", "")
+                role_keywords = [w.lower() for w in roles for w in w.split() if len(w) > 3]
+                title_lower = title.lower()
+                if role_keywords and not any(kw in title_lower for kw in role_keywords):
+                    continue
+                similar.append(jd)
+        except:
+            pass
+        return similar
+
     async def apply_to_job(self, page: Page, job: dict) -> ApplicationResult:
         try:
             await page.goto(job["url"], wait_until="domcontentloaded", timeout=TIMEOUT)
@@ -314,6 +369,13 @@ class IndeedPortal(BasePortal):
                     job["description"] = (await desc_el.text_content()).strip()
             except:
                 pass
+            
+            if not job.get("description", "").strip():
+                job["description"] = job.get("title", "")
+
+            # --- Filter by Experience (with description) ---
+            if is_experienced_role(job.get("title", ""), job.get("description", "")):
+                return ApplicationResult(job=job, status="skipped", reason="Requires experience (not fresher/intern)")
 
             # Wait for the Indeed Apply button to render (JS widget)
             apply_sel_found = None
@@ -551,10 +613,16 @@ class IndeedPortal(BasePortal):
         """Given a context string, return the appropriate fill value or None to skip."""
         if "year" in ctx or "experience" in ctx:
             return "0"
-        if "salary" in ctx or "ctc" in ctx or "expected" in ctx or "pay" in ctx:
-            return "0"
-        if "degree" in ctx or "education" in ctx or "qualification" in ctx:
+        if "expected" in ctx or "desired" in ctx:
+            return "400000"
+        if "salary" in ctx or "ctc" in ctx or "pay" in ctx:
+            return "0" 
+        if "bachelor" in ctx or "undergraduate" in ctx or "ug" in ctx:
+            return "BSc"
+        if "master" in ctx or "postgraduate" in ctx or "pg" in ctx:
             return "MCA"
+        if "degree" in ctx or "education" in ctx or "qualification" in ctx:
+            return "MCA" 
         if "skill" in ctx or "technology" in ctx or "tools" in ctx:
             return "Python, Django, Machine Learning, React, JavaScript"
         if "notice" in ctx or "join" in ctx:

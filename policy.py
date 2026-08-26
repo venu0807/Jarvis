@@ -78,7 +78,7 @@ DEFAULT_POLICY = {
     # default. To allow cloud: set JARVIS_ALLOW_CLOUD=1 in the env of that
     # one-off session, and pick a model from policy.allowed_cloud_providers.
     "default_cloud_model": "",   # ← empty = block by default
-    "default_local_model": "phi4-mini:latest",
+    "default_local_model": "qwen2.5-coder:3b",
     "ollama_url": "http://localhost:11434",
     "allowed_cloud_providers": ["ollama-cloud", "nvidia", "groq"],
     "denied_cloud_providers": ["openai", "anthropic"],

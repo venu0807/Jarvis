@@ -1,138 +1,229 @@
+#!/usr/bin/env python3
+"""
+email_listener.py — Enhanced 24/7 Real-Time Interview & Assessment Detection Daemon.
+Monitors Gmail for recruiter emails, extracts details via Ollama, creates calendar invites,
+and generates AI Interview Prep Cheat Sheets.
+"""
+
 import imaplib
 import email
 from email.header import decode_header
 import os
-import random
 import sys
+import re
 import time
 import json
-import requests
+from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent
+JARVIS_HOME = BASE_DIR.parent.parent
+ENV_PATH = BASE_DIR / ".env"
+PROCESSED_FILE = BASE_DIR / "processed_emails.json"
 
-# Route via JARVIS chokepoint.
-try:
-    # Resolve project root relative to this script — always correct.
-    JARVIS_HOME = str(Path(__file__).resolve().parent.parent.parent)
-    if JARVIS_HOME not in sys.path:
-        sys.path.insert(0, JARVIS_HOME)
-    from policy import call_llm   # type: ignore
-except Exception as e:  # pragma: no cover
-    raise SystemExit(
-        f"FATAL: email_listener cannot import ~/.jarvis/policy: {e!r}. "
-        "Refusing direct ollama — strict-zero-leak requires policy audit log."
-    )
+load_dotenv(ENV_PATH)
+
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+if str(JARVIS_HOME) not in sys.path:
+    sys.path.insert(0, str(JARVIS_HOME))
+
+from calendar_manager import add_interview_to_calendar
+from prep_generator import generate_prep_sheet
+from policy import call_llm
 
 GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_PASS = os.getenv("GMAIL_APP_PASSWORD")
 
-def parse_with_ollama(email_body: str) -> dict:
-    """Uses local Ollama to parse Company Name and Interview Date/Time."""
-    prompt = f"""
-    You are an AI assistant. I will give you the text of an email.
-    Extract the following two things:
-    1. The Company Name that is scheduling the interview.
-    2. The exact Date and Time of the interview (convert to ISO format YYYY-MM-DDTHH:MM:SS if possible).
-    
-    If it is NOT an interview email, return empty strings.
-    Return strictly a JSON object: {{"company_name": "...", "date_time": "..."}}
-    Do not output any other text, only the JSON.
-    
-    Email Text:
-    {email_body[:1500]}
-    """
-    
+
+def get_processed_ids() -> set:
+    if PROCESSED_FILE.exists():
+        try:
+            with open(PROCESSED_FILE, "r", encoding="utf-8") as f:
+                return set(json.load(f))
+        except:
+            return set()
+    return set()
+
+
+def save_processed_id(eid: str):
+    processed = get_processed_ids()
+    processed.add(eid)
     try:
-        # Route via JARVIS policy. Emails may contain applicant name + DOB +
-        # resume snippets; treat as PII-class even though local is already
-        # the default model — the audit log is what we need.
-        result = call_llm(
+        with open(PROCESSED_FILE, "w", encoding="utf-8") as f:
+            json.dump(list(processed), f, indent=2)
+    except Exception as e:
+        print(f"⚠️ Error saving processed ID: {e}")
+
+
+def extract_email_text(msg) -> tuple[str, str, str, str]:
+    """Extract decoded subject, sender, date, and clean body text (handling text/html)."""
+    subj = msg.get("Subject", "")
+    decoded_subject = ""
+    for p, enc in decode_header(subj):
+        if isinstance(p, bytes):
+            decoded_subject += p.decode(enc or "utf-8", errors="ignore")
+        else:
+            decoded_subject += str(p)
+
+    sender = msg.get("From", "")
+    date_hdr = msg.get("Date", "")
+
+    body = ""
+    if msg.is_multipart():
+        for bp in msg.walk():
+            ctype = bp.get_content_type()
+            if ctype in ["text/plain", "text/html"]:
+                pl = bp.get_payload(decode=True)
+                if pl:
+                    raw_text = pl.decode("utf-8", errors="replace")
+                    if ctype == "text/html":
+                        clean = re.sub(r'<[^>]+>', ' ', raw_text)
+                        clean = re.sub(r'\s+', ' ', clean).strip()
+                        body += clean + "\n"
+                    else:
+                        body += raw_text + "\n"
+    else:
+        pl = msg.get_payload(decode=True)
+        if pl:
+            raw_text = pl.decode("utf-8", errors="replace")
+            clean = re.sub(r'<[^>]+>', ' ', raw_text)
+            body = re.sub(r'\s+', ' ', clean).strip()
+
+    return decoded_subject.strip(), sender.strip(), date_hdr.strip(), body.strip()
+
+
+def parse_interview_with_llm(subject: str, sender: str, body: str) -> dict:
+    """Uses local LLM to extract company, role, date/time and confirm if it's an interview/test invitation."""
+    prompt = f"""You are an AI recruiter assistant.
+Analyze this email and determine if it is an interview invitation, coding assessment/test, screening call, or recruiter discussion.
+
+Subject: {subject}
+From: {sender}
+Email Body Snippet:
+{body[:2000]}
+
+If it IS an interview, assessment, or recruiter meeting, extract:
+- "is_interview": true
+- "company_name": "Name of the company"
+- "job_role": "Role (e.g. Python Developer, Full Stack Intern)"
+- "date_time": "Date and Time (e.g. 2026-08-27 15:00 or ISO format, or 'TBD')"
+- "meeting_link": "URL to Google Meet / Teams / Zoom / Assessment link if present, else ''"
+
+If it is just a newsletter, generic rejection, job alert, or marketing email, return:
+{{"is_interview": false, "company_name": "", "job_role": "", "date_time": "", "meeting_link": ""}}
+
+Output strictly valid JSON with no markdown and no other text:
+"""
+    try:
+        res = call_llm(
             prompt=prompt,
             mode="run",
             force="local",
             pii_acknowledged=True,
-            task_label="parse_interview_email",
+            task_label="parse_interview_email"
         )
-        payload = result.text or ""
-        return json.loads(payload)
+        text = (res.text or "").strip()
+        if "```" in text:
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.strip()
+        data = json.loads(text)
+        return data
     except Exception as e:
-        print(f"Ollama parsing failed: {e}")
+        print(f"  ⚠️ LLM parsing error: {e}")
+        return {"is_interview": False}
 
-    return {"company_name": "", "date_time": ""}
 
-def listen_for_interviews():
+def check_and_process_emails():
     if not GMAIL_USER or not GMAIL_PASS:
         print("❌ GMAIL_USER or GMAIL_APP_PASSWORD missing in .env")
         return
-        
-    print("⏳ Checking for interview emails on IMAP...")
-    
+
+    print("📬 Checking for new interview & assessment emails...")
     try:
         mail = imaplib.IMAP4_SSL("imap.gmail.com")
         mail.login(GMAIL_USER, GMAIL_PASS)
         mail.select("inbox")
 
-        # Search for unread emails containing "interview" (broader search)
-        # Also include common variations used by recruiters
-        search_criteria = '(OR UNSEEN UNSEEN) SUBJECT "interview"'  # Check unseen by default
-        status, messages = mail.search(None, search_criteria)
+        processed = get_processed_ids()
+        since_date = (datetime.now() - timedelta(days=7)).strftime("%d-%b-%Y")
         
-        if status == "OK" and messages[0]:
-            email_ids = messages[0].split()
-            print(f"📬 Found {len(email_ids)} unread interview-related emails.")
-            
-            for eid in email_ids:
-                try:
-                    res, msg_data = mail.fetch(eid, '(RFC822)')
-                    for response_part in msg_data:
-                        if isinstance(response_part, tuple):
-                            msg = email.message_from_bytes(response_part[1])
-                            subject, encoding = decode_header(msg["Subject"])[0]
-                            if isinstance(subject, bytes):
-                                subject = subject.decode(encoding if encoding else "utf-8")
+        status, messages = mail.search(None, f'(SINCE "{since_date}")')
+        if status != "OK" or not messages[0]:
+            print("📭 No emails found in date range.")
+            mail.logout()
+            return
+
+        eids = messages[0].split()
+        for eid_bytes in reversed(eids):
+            eid = eid_bytes.decode()
+            if eid in processed:
+                continue
+
+            try:
+                res, msg_data = mail.fetch(eid_bytes, '(RFC822)')
+                for part in msg_data:
+                    if isinstance(part, tuple):
+                        msg = email.message_from_bytes(part[1])
+                        subj, sender, date_hdr, body = extract_email_text(msg)
+
+                        combined = f"{subj} {body}".lower()
+                        keywords = [
+                            "interview", "shortlist", "assessment", "discussion", "coding test",
+                            "hiring process", "screening", "technical round", "video call",
+                            "google meet", "teams.microsoft", "zoom.us", "hackerrank", "glider",
+                            "test link", "invitation for", "online assessment", "uncodemy", "next steps"
+                        ]
+
+                        if any(k in combined for k in keywords):
+                            print(f"\n🎯 [Email #{eid}] Evaluating: '{subj}' from {sender}")
+                            parsed = parse_interview_with_llm(subj, sender, body)
                             
-                            print(f"  → Processing Subject: {subject}")
-                            
-                            body = ""
-                            if msg.is_multipart():
-                                for part in msg.walk():
-                                    if part.get_content_type() == "text/plain":
-                                        payload = part.get_payload(decode=True)
-                                        if payload:
-                                            body = payload.decode("utf-8", errors="replace")
-                                            break
-                            else:
-                                payload = msg.get_payload(decode=True)
-                                if payload:
-                                    body = payload.decode("utf-8", errors="replace")
-                            
-                            if body:
-                                parsed_data = parse_with_ollama(body)
-                                print(f"  🤖 Ollama Parsed: {parsed_data}")
-                                
-                                if parsed_data.get("company_name") and parsed_data.get("date_time"):
-                                    print(f"  📅 Sending to Calendar -> {parsed_data['company_name']} at {parsed_data['date_time']}")
-                                    from calendar_manager import add_interview_to_calendar
-                                    add_interview_to_calendar(parsed_data["company_name"], parsed_data["date_time"])
-                except Exception as e:
-                    print(f"  ⚠️  Error processing email {eid}: {e}")
-                            
-        else:
-            print("📭 No new interview emails.")
-            
+                            if parsed.get("is_interview") and parsed.get("company_name"):
+                                comp = parsed["company_name"]
+                                dt = parsed.get("date_time", "Upcoming")
+                                role = parsed.get("job_role", "Developer")
+                                print(f"🎉 INTERVIEW/TEST DETECTED: {comp} ({role}) at {dt}")
+
+                                # 1. Create Calendar Event (.ics)
+                                try:
+                                    add_interview_to_calendar(comp, dt)
+                                except Exception as ce:
+                                    print(f"  ⚠️ Calendar error: {ce}")
+
+                                # 2. Generate AI Prep Sheet
+                                try:
+                                    prep_path = generate_prep_sheet(comp, dt)
+                                    print(f"  📄 AI Prep Sheet generated: {prep_path}")
+                                except Exception as pe:
+                                    print(f"  ⚠️ Prep generation error: {pe}")
+
+                            save_processed_id(eid)
+                        else:
+                            save_processed_id(eid)
+            except Exception as ex:
+                print(f"⚠️ Error checking email #{eid}: {ex}")
+
         mail.logout()
-    except imaplib.IMAP4.error as e:
-        print(f"❌ IMAP Connection Error: {e}")
-        print("   Check GMAIL_USER / GMAIL_APP_PASSWORD in .env")
-        print("   Also ensure IMAP is enabled in Gmail settings")
+        print("✅ Finished checking emails.")
     except Exception as e:
-        print(f"❌ IMAP Error: {e}")
+        print(f"❌ IMAP listener error: {e}")
+
+
+def main_daemon_loop():
+    print("🚀 JARVIS Interview & Prep Listener Daemon Starting...")
+    while True:
+        try:
+            check_and_process_emails()
+        except Exception as e:
+            print(f"❌ Daemon loop error: {e}")
+        
+        # Sleep 5 minutes between active IMAP polling checks
+        time.sleep(300)
+
 
 if __name__ == "__main__":
-    print("🚀 Starting Email Listener...")
-    print("📬 Checking for new interview emails...")
-    listen_for_interviews()
-    print("✅ Finished checking emails.")
+    main_daemon_loop()

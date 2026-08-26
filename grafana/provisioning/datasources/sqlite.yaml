@@ -1,0 +1,29 @@
+apiVersion: 1
+
+datasources:
+  - name: SQLite_Jobs
+    uid: sqlite_jobs_uid
+    type: frser-sqlite-datasource
+    access: proxy
+    url: file:/var/lib/grafana/job_data/jobs.db?mode=ro
+    isDefault: true
+    version: 1
+    editable: true
+
+  - name: SQLite_Metrics
+    uid: sqlite_metrics_uid
+    type: frser-sqlite-datasource
+    access: proxy
+    url: file:/var/lib/grafana/automations/metrics.db?mode=ro
+    isDefault: false
+    version: 1
+    editable: true
+
+  - name: SQLite_SentTracker
+    uid: sqlite_outreach_uid
+    type: frser-sqlite-datasource
+    access: proxy
+    url: file:/var/lib/grafana/outreach_data/sent_tracker.db?mode=ro
+    isDefault: false
+    version: 1
+    editable: true

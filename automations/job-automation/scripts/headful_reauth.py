@@ -115,6 +115,7 @@ async def main():
     parser.add_argument("--skip",
                         help="Comma-separated subset to skip (foundit,indeed,internshala,cutshort,freshersworld,wellfound)")
 
+    args = parser.parse_args()
     only_set = set((args.only  or "").split(",")) - {""}
     skip_set = set((args.skip  or "").split(",")) - {""}
 

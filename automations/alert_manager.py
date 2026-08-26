@@ -317,24 +317,42 @@ This is an automated message from JARVIS Job Automation System.
         # Build tags
         alert_tags = tags + [severity, "jarvis"]
         
-        headers = {
-            "Title": title,
-            "Priority": priority,
-            "Tags": ",".join(alert_tags),
-        }
+        # Strip non-ASCII characters from ALL header values for ntfy/latin-1 compatibility
+        def ascii_safe(s: str) -> str:
+            """Ensure string is ASCII-safe for HTTP headers."""
+            return s.encode('ascii', 'ignore').decode('ascii').strip()
         
-        # Add deep link action
+        safe_title = ascii_safe(title)
+        if not safe_title:
+            safe_title = "JARVIS Alert"
+        
+        # Sanitize all header values
+        safe_priority = ascii_safe(priority)
+        safe_tags = ",".join(ascii_safe(t) for t in alert_tags)
         alert_id = hashlib.md5(f"{title}{message}".encode()).hexdigest()[:8]
         deep_link = f"jarvis://alert/{alert_id}"
-        headers["Actions"] = f'view,{deep_link},View Details'
+        safe_actions = ascii_safe(f'view,{deep_link},View Details')
+        
+        headers = {
+            "Title": safe_title,
+            "Priority": safe_priority,
+            "Tags": safe_tags,
+            "Actions": safe_actions,
+        }
         
         try:
-            resp = requests.post(
-                f"{server}/{topic}",
-                data=message,
-                headers=headers,
-                timeout=10
+            # ntfy.sh supports UTF-8 in message body; headers must be ASCII/latin-1.
+            # All headers sanitized via ascii_safe(). Body sent as UTF-8.
+            from requests.models import PreparedRequest
+            req = PreparedRequest()
+            req.prepare(
+                method="POST",
+                url=f"{server}/{topic}",
+                data=message.encode("utf-8"),
+                headers={**headers, "Content-Type": "text/plain; charset=utf-8"},
             )
+            with requests.Session() as s:
+                resp = s.send(req, timeout=10)
             resp.raise_for_status()
             return True
         except Exception as e:

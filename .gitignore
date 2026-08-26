@@ -118,3 +118,18 @@ automations/pinterest/debug_upload.html
 automations/pinterest/failed_publish.png
 .claude-flow/
 automations/micro-learning/daily_lesson.md
+
+# Additional Runtime & Session Ignores
+*.lock
+*.log*
+*.out
+*.db-wal
+*.db-shm
+.sessions/
+automations/job-automation/.sessions/
+automations/interview_scheduler_prep_bot/processed_emails.json
+logs/
+automations/logs/
+automations/dashboard-nextjs/.next/
+automations/dashboard-nextjs/node_modules/
+grafana/plugins/

@@ -353,12 +353,6 @@ def run_automation(max_pins: int = None, category: str = None):
     print("   Using API v5 → Browser fallback")
     print("=" * 55)
 
-    print("\n  🔄 Refilling from live trends...")
-    try:
-        refill_trending()
-    except Exception as e:
-        print(f"  ⚠️ Auto-refill failed: {e}")
-
     # Check CSV exists
     if not True:
         print(f"\n  ❌ {CSV_FILE} not found!")

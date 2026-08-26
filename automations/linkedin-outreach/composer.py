@@ -14,12 +14,17 @@ mode="run", which means:
     provider, latency, PII finding summary
 
 Cloud models were previously the default fallback. They are now opt-in only.
+
+UPDATE 2026-08-21: Added support for 5 email templates (T1-T5) per 2-month
+job hunt plan. Templates live in templates.py and can be selected via
+the template_id parameter.
 """
 
 import os
 import sys
 import time
 import random
+import json
 from pathlib import Path
 from typing import Optional, List
 
@@ -27,9 +32,6 @@ from typing import Optional, List
 # means someone moved / deleted ~/.jarvis/policy.py. We do not want silent
 # direct-ollama fallback because that is the very behaviour we're fixing.
 try:
-    # Resolve project root relative to this script — always correct.
-    # NOTE: os.environ.get("JARVIS_HOME") is NOT used here because it may
-    # point to ~/.jarvis (doesn't exist) instead of the actual project root.
     JARVIS_HOME = str(Path(__file__).resolve().parent.parent.parent)
     if JARVIS_HOME not in sys.path:
         sys.path.insert(0, JARVIS_HOME)
@@ -41,16 +43,12 @@ except Exception as e:  # pragma: no cover
         f"Original error: {e!r}"
     )
 
-
 # Default LOCAL chain (no cloud). Cloud is opt-in via JARVIS_ALLOW_CLOUD=1.
-# Ordered fastest local → most reliable. Same order the user previously
-# chose when forcing local-only via OLLAMA_FALLBACK_CHAIN.
 DEFAULT_LOCAL_CHAIN = [
-    "qwen2.5-coder:7b",   # good at structured prose
-    "phi4-mini:latest",   # fastest on this box
+    "qwen2.5-coder:3b",   # good at structured prose, fast on 8 GB RAM
+    "llama3.2:3b",        # fallback
 ]
 
-# Allow override via OLLAMA_FALLBACK_CHAIN for ops tweaks (comma-separated).
 def _resolve_chain() -> List[str]:
     env = os.getenv("OLLAMA_FALLBACK_CHAIN", "")
     if env:
@@ -59,18 +57,15 @@ def _resolve_chain() -> List[str]:
 
 
 def _cloud_is_allowed() -> bool:
-    """True only when the user explicitly opted in for this session."""
     return os.environ.get("JARVIS_ALLOW_CLOUD", "").strip() in ("1", "true", "yes")
 
 
 def _strip_cloud_entries(chain: List[str]) -> List[str]:
-    """Drop any '-cloud' suffixed model from a chain unless cloud is allowed."""
     if _cloud_is_allowed():
         return chain
     cleaned = []
     dropped = []
     for m in chain:
-        # Conservative: any 'cloud' substring in the model name
         if "cloud" in m.lower():
             dropped.append(m)
         else:
@@ -86,20 +81,13 @@ def _strip_cloud_entries(chain: List[str]) -> List[str]:
 
 
 def _try_model_via_policy(model: str, prompt: str, recruiter_name: str) -> Optional[str]:
-    """
-    Send the prompt to `model` via jarvis.policy.call_llm().
-    mode="run" forces the policy to use a local-only model when PII is
-    detected; the policy's PII detector triggers on the recruiter's name
-    and any "Venu"-class identifiers. The model arg we pass is a *hint*;
-    the policy may override it (notably: cloud → local when PII detected).
-    """
     t0 = time.time()
     try:
         result = call_llm(
             prompt=prompt,
             mode="run",
             force="auto",
-            pii_acknowledged=True,           # we KNOW PII is in the prompt
+            pii_acknowledged=True,
             task_label=f"cold_email:{recruiter_name}",
         )
     except Exception as e:
@@ -119,89 +107,115 @@ def _try_model_via_policy(model: str, prompt: str, recruiter_name: str) -> Optio
 
 
 def _try_model(model, prompt, timeout_s=90):
-    """DEPRECATED — kept only as a safety net for import-time tests.
-
-    All real generation goes through `_try_model_via_policy` which routes
-    through `~/.jarvis/policy.call_llm()`. This wrapper now refuses to call
-    ollama directly outside that policy — a direct-ollama call here would
-    silently bypass the zero-leak audit log. Hard error.
-    """
+    """DEPRECATED — all generation must go through _try_model_via_policy."""
     raise SystemExit(
         "FATAL: composer._try_model called directly. "
-        "All generation must go through jarvis.policy.call_llm() "
-        "(see _try_model_via_policy). Refusing to bypass."
+        "All generation must go through jarvis.policy.call_llm()."
     )
 
 
-def _build_prompt(recruiter_name: str, post_text: str, bio_text: str, opener: str, closer: str) -> str:
-    """Build the cold-email prompt with opener/closer variance and bio context."""
-    return f"""You are a fresher Python/Django/AI Developer writing a personalized cold email to a recruiter.
+def _build_prompt(
+    recruiter_name: str,
+    post_text: str,
+    bio_text: str,
+    portfolio_text: str,
+    template_id: str = "T2",
+) -> str:
+    """Build the cold-email prompt using one of 5 templates (T1-T5)."""
+
+    first_name = recruiter_name.split()[0] if recruiter_name else "there"
+
+    from templates import get_template
+    template_body = get_template(template_id)
+
+    return f"""You are an AI assistant helping a candidate write a personalized cold email/message to a recruiter on LinkedIn.
 
 Recruiter's Name: {recruiter_name}
 LinkedIn Post Content: {post_text}
-Recruiter's Bio/Recent Activity: {bio_text if bio_text else 'Not available'}
+Recruiter Bio: {bio_text}
 
-Write a 3-paragraph professional cold email:
-- Paragraph 1: Start with a hyper-personalized icebreaker that references something from their "Bio/Recent Activity" or their "Post Content". Prove you actually read their profile. Then transition smoothly.
-- Paragraph 2: Briefly highlight skills in Python, Django, React/JavaScript, ML/CNN (whichever fits the post).
-- Paragraph 3 close with: {closer}
+Use EXACTLY the following template structure (template {template_id}), filling in placeholders based on the LinkedIn post and bio:
+
+{template_body}
+
+Portfolio (cite 1-2 projects in the email body when relevant):
+{portfolio_text}
+
+Placeholders to fill:
+- {{first_name}}: Use first name. Default: {first_name}
+- {{role}}: Job title from post. Default: "a software engineering role"
+- {{company}}: Company name from post. Default: "your team"
+- {{specific_thing}}: One specific thing they did/posted. Reference something concrete from their post or bio.
 
 Rules:
-- Professional and concise (max 200 words).
-- No placeholders like [Name] — sign off as "Venu".
-- Do NOT include the subject line, just the body.
-- Do NOT echo the prompt back. Start directly with the email body."""
+- Output starts with "Subject: " on the very first line.
+- Subject should be <=60 chars and mention the role/company.
+- Body should be <=300 words for DM-style templates (T1, T2, T3, T5), <=400 for T4 (cover letter).
+- Include 1-2 portfolio projects when relevant (cite JARVIS most often).
+- Reference one specific thing from their post/bio (the {{specific_thing}} placeholder).
+- Do NOT echo the prompt or template structure back. Just output the email.
+- CRITICAL: If the job mentioned is Sales, HR, BPO, Customer Support, Marketing, or NOT Software Engineering / Data / AI, output EXACTLY: UNRELATED_ROLE"""
 
 
-_OPENERS = [
-    "I came across your recent LinkedIn post and the role caught my attention.",
-    "Your recent post on LinkedIn stood out to me as a strong match for my background.",
-    "I saw your LinkedIn update about this opening and wanted to reach out directly.",
-    "Noticed your recent post while scrolling LinkedIn — the role describes exactly what I do.",
-    "Your recent LinkedIn post about this opening resonated with my project experience.",
-]
-
-_CLOSERS = [
-    "I've attached my resume for your review. Would a 15-minute call this week work?",
-    "Resume attached for context. Happy to share more details over a quick call.",
-    "My resume is attached. Could we schedule a brief introduction call?",
-    "Resume attached. I'm flexible on timing for a short introductory chat.",
-    "Take a look at the attached resume when convenient. Looking forward to hearing back.",
-]
-
-
-def generate_cold_email(post_text, recruiter_name, bio_text=""):
+def generate_cold_email(
+    post_text: str,
+    recruiter_name: str,
+    bio_text: str = "",
+    template_id: str = "T2",
+    tier: str = "T3",
+):
     """Generate a personalized cold email through JARVIS policy.
 
-    Returns the email body, or None if every model in the chain failed.
-    All calls are routed through `~/.jarvis/policy.call_llm()` with
-    mode="run" — strict-zero-leak by default. With PII in the prompt the
-    policy will refuse any cloud model and force local-only execution.
+    Args:
+        post_text: The LinkedIn post content (job description / recruiter's post).
+        recruiter_name: Recruiter's full name.
+        bio_text: Recruiter's bio from profile scrape (optional).
+        template_id: One of T1, T2, T3, T4, T5. Defaults to T2 (LinkedIn DM).
+        tier: T1 (founder), T2 (hiring manager), T3 (recruiter reply). Used for metrics only.
+
+    Returns:
+        Tuple of (subject, body), or (None, None) on failure.
     """
     chain = _strip_cloud_entries(_resolve_chain())
     if not chain:
         print("  ❌ NO models left in chain (all were 'cloud' and JARVIS_ALLOW_CLOUD is unset).")
-        return None
+        return None, None
 
-    # opener/closer variance so identical engines output distinct emails
-    # The opener is now dynamically generated by the LLM, but we pass closer
-    opener = "" 
-    closer = random.choice(_CLOSERS)
-    prompt = _build_prompt(recruiter_name, post_text, bio_text, opener, closer)
+    # Load portfolio
+    portfolio_text = ""
+    portfolio_path = Path(__file__).parent / "portfolio.json"
+    if portfolio_path.exists():
+        try:
+            with open(portfolio_path, "r", encoding="utf-8") as f:
+                projects = json.load(f)
+                for p in projects:
+                    portfolio_text += f"- {p.get('project_name', 'Project')}: {p.get('description', '')} (Stack: {p.get('tech_stack', '')})\n"
+        except Exception as e:
+            print(f"  ⚠ Failed to load portfolio.json: {e}")
+
+    prompt = _build_prompt(recruiter_name, post_text, bio_text, portfolio_text, template_id)
 
     print(
         f"  🤖 generating email for {recruiter_name!r} "
-        f"(policy-routed; chain try-order: {' → '.join(chain)})"
+        f"(template={template_id}, tier={tier}; chain: {' → '.join(chain)})"
     )
 
     for model in chain:
-        # The 'model' arg is a hint — call_llm() will still enforce mode/run
-        # audit-logging and PII rules. If policy decides to swap the model
-        # because the requested one is denied, we get the actual model back
-        # in result.model and continue.
-        body = _try_model_via_policy(model, prompt, recruiter_name)
-        if body:
-            return body
+        response = _try_model_via_policy(model, prompt, recruiter_name)
+        if response:
+            if "UNRELATED_ROLE" in response:
+                print(f"  ↪ AI rejected {recruiter_name}'s post as unrelated non-tech role.")
+                return None, None
+
+            lines = response.strip().split("\n")
+            subject = f"Application - {recruiter_name}"
+            body = response
+
+            if lines[0].lower().startswith("subject:"):
+                subject = lines[0][8:].strip()
+                body = "\n".join(lines[1:]).strip()
+
+            return subject, body
 
     print(f"  ❌ ALL models failed for {recruiter_name!r}. Audit-logged in ~/.jarvis/audit.log.")
-    return None
+    return None, None

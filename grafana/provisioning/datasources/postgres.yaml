@@ -1,0 +1,17 @@
+apiVersion: 1
+
+datasources:
+  - name: Postgres_Jarvis
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    user: jarvis
+    secureJsonData:
+      password: jarvis
+    database: jarvis
+    isDefault: false
+    version: 1
+    editable: true
+    jsonData:
+      sslmode: 'disable'
+      postgresVersion: 1600

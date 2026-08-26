@@ -1,11 +1,11 @@
 apiVersion: 1
 
 providers:
-  - name: 'JARVIS Dashboards'
+  - name: 'Jarvis Dashboards'
     orgId: 1
-    folder: 'JARVIS'
+    folder: ''
     type: file
     disableDeletion: false
-    editable: true
+    updateIntervalSeconds: 10
     options:
       path: /var/lib/grafana/dashboards

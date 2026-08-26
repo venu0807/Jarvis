@@ -231,9 +231,15 @@ def _acquire_run_lock() -> bool:
         if lock_path.exists():
             prior_pid = lock_path.read_text().strip()
             if prior_pid.isdigit() and prior_pid != str(os.getpid()):
-                # PID alive?
                 try:
                     os.kill(int(prior_pid), 0)
+                    # verify it's actually our python process, not a reused PID
+                    try:
+                        cmdline = Path(f"/proc/{prior_pid}/comm").read_text().strip()
+                        if "python" not in cmdline.lower():
+                            raise ProcessLookupError("PID reused by non-python process")
+                    except FileNotFoundError:
+                        pass
                     print(f"⛔ Another pipeline run is active (pid {prior_pid}). Exiting to avoid clobbering today's summary.")
                     return False
                 except (ProcessLookupError, PermissionError, ValueError):
@@ -291,19 +297,27 @@ async def main():
             session_file = SESSION_DIR / f"{name}.json"
             if session_file.exists():
                 print(f"\n💾 {name}: loading saved session from {session_file.name}")
-            context = await browser_mgr.new_context_with_session(session_file)
 
+            context = None
             try:
+                context = await browser_mgr.new_context_with_session(session_file)
                 results, session_ok = await run_portal(name, cls, context)
                 all_results.extend(results)
                 if not session_ok:
                     needs_relogin.append(name)
+                
+                # Save results immediately to DB after each portal
+                try:
+                    save_jobs_to_db(results)
+                except Exception as dbe:
+                    print(f"  ⚠️ Could not save {name} jobs to DB: {dbe}")
+
                 await browser_mgr.save_session(context, session_file)
             except Exception as e:
-                print(f"\n❌ {name} portal crashed: {e}")
-                traceback.print_exc()
+                print(f"\n❌ {name} portal error: {e}")
             finally:
-                await safe_close_async(context)
+                if context:
+                    await safe_close_async(context)
 
     # Save all scraped jobs to the SQLite Database (for Interview Prep Bot)
     try:
