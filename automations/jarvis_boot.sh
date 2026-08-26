@@ -13,11 +13,11 @@ echo "▶ [1/5] Starting System Daemons (Cron & PostgreSQL)..."
 service cron start 2>/dev/null || true
 service postgresql start 2>/dev/null || true
 
-# 2. Start Local AI Engine (Ollama)
+# 2. Start Local AI Engine (Ollama with 30s auto-unload for lean RAM)
 echo "▶ [2/5] Starting Local AI Engine (Ollama)..."
 if ! pgrep -f "ollama serve" > /dev/null; then
-    su - venu -c "nohup /usr/local/bin/ollama serve > /dev/null 2>&1 &"
-    echo "  ✔ Ollama service launched."
+    su - venu -c "export OLLAMA_KEEP_ALIVE=30s && nohup /usr/local/bin/ollama serve > /dev/null 2>&1 &"
+    echo "  ✔ Ollama service launched (OLLAMA_KEEP_ALIVE=30s for automatic RAM release)."
 else
     echo "  ✔ Ollama is already running."
 fi
@@ -51,7 +51,7 @@ echo "======================================================"
 echo "  ✅ ALL JARVIS SYSTEMS ARE ONLINE & OPERATIONAL!"
 echo "======================================================"
 echo "  🌐 Dashboard URL: http://localhost:3001"
-echo "  🧠 Local AI Engine: Ready (qwen2.5-coder:3b)"
+echo "  🧠 Local AI Engine: Ready (Auto-unloads after 30s)"
 echo "  📅 Interview Listener: Active (24/7 IMAP)"
 echo "  💼 Job Monitor: Active"
 echo "======================================================"
