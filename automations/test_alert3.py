@@ -17,10 +17,10 @@ from automations.alert_manager import AlertManager
 m = AlertManager()
 
 # Check the config
-print(f"Ntfy config: {m.config[\"channels\"][\"ntfy\"]}")
+print("Ntfy config:", m.config.get("channels", {}).get("ntfy", {}))
 
 # Try to trace through _send_ntfy manually
-config = m.config["channels"]["ntfy"]
+config = m.config.get("channels", {}).get("ntfy", {})
 topic = config.get("topic", "jarvis-alerts")
 server = config.get("server", "https://ntfy.sh")
 priority = config.get("priority", "default")
