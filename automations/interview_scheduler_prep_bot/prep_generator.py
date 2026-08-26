@@ -1,6 +1,6 @@
 """
-prep_generator.py — Generate interview prep sheets via JARVIS policy.
-Upgraded with fuzzy company matching, JD discovery, and news fetching.
+prep_generator.py — Generate comprehensive interview master guides via JARVIS policy.
+Upgraded with full topic coverage, fuzzy company matching, JD discovery, and news fetching.
 """
 
 import sqlite3
@@ -26,7 +26,6 @@ PREP_DIR = Path(__file__).parent / "prep_sheets"
 def get_company_news(company_name: str) -> str:
     print(f"  📰 Fetching real-time news for {company_name}...")
     try:
-        # Strip legal suffixes for news search
         clean_name = re.sub(r'(?i)\b(edutech|pvt|ltd|private|limited|technologies|tech|solutions|services|llp|inc|corp)\b', '', company_name).strip()
         url = f"https://news.google.com/rss/search?q={clean_name or company_name}+business+OR+tech"
         res = requests.get(url, timeout=10)
@@ -48,7 +47,7 @@ def get_company_news(company_name: str) -> str:
 def fetch_job_description(company_name: str) -> tuple[str, str]:
     """Fuzzy search jobs.db for the matching company and job description."""
     if not DB_PATH.exists():
-        return "Software Developer", ""
+        return "Software Developer / Tester", ""
     
     clean_comp = re.sub(r'(?i)\b(edutech|pvt|ltd|private|limited|technologies|tech|solutions|services|llp|inc|corp)\b', '', company_name).strip()
     clean_comp = re.sub(r'\s+', ' ', clean_comp).strip()
@@ -56,7 +55,6 @@ def fetch_job_description(company_name: str) -> tuple[str, str]:
 
     try:
         with sqlite3.connect(DB_PATH) as conn:
-            # 1. Exact match or broad match
             cur = conn.execute(
                 "SELECT title, description FROM jobs WHERE company LIKE ? OR company LIKE ? ORDER BY id DESC LIMIT 1",
                 (f"%{clean_comp}%", f"%{first_word}%")
@@ -67,10 +65,10 @@ def fetch_job_description(company_name: str) -> tuple[str, str]:
     except Exception as e:
         print(f"  ⚠️ DB Query error: {e}")
     
-    return "Developer", ""
+    return "Software Tester / QA & Python Developer", ""
 
 def generate_prep_sheet(company_name: str, interview_date: str = "Upcoming") -> str:
-    print(f"🧠 Generating AI Prep Sheet for {company_name}...")
+    print(f"🧠 Generating Comprehensive Master Prep Guide for {company_name}...")
     PREP_DIR.mkdir(parents=True, exist_ok=True)
     
     real_time_news = get_company_news(company_name)
@@ -79,29 +77,34 @@ def generate_prep_sheet(company_name: str, interview_date: str = "Upcoming") -> 
     if jd_text:
         print(f"  ✅ Found JD: {job_title} @ {company_name}")
     else:
-        print(f"  ⚠️ JD not found for {company_name}. Generating tailored developer prep.")
+        print(f"  ⚠️ JD not found for {company_name}. Generating tailored comprehensive prep.")
 
-    prompt = f"""You are an elite Silicon Valley interview coach.
+    prompt = f"""You are an elite Silicon Valley technical interview coach and QA/Engineering Lead.
 I have an interview with {company_name} for the role of "{job_title}" coming up on {interview_date}.
 
-Below is the Job Description for the role I applied for:
+Job Description / Context:
 ---
-{jd_text or 'Junior / Fresher Software & Web Developer role focusing on Python, Django, React, HTML, CSS, JavaScript, and backend APIs.'}
+{jd_text or 'Software Tester / QA Automation Engineer & Python Developer (Manual testing, Playwright, PyTest, REST API testing, SQL queries, Python DSA, Bug Life Cycle, SDLC/STLC).'}
 ---
 
-Here is the real-time news and latest developments about {company_name}:
+Recent News & Company Info:
 ---
 {real_time_news}
 ---
 
-Generate a concise, highly strategic 1-page "Cheat Sheet" for me to read 15 minutes before the interview:
-1. **The Core Mission**: 1-sentence summary of what this role does and how it impacts the business.
-2. **Top 3 Technical Focus Areas**: The 3 most critical skills to demonstrate (with specific talking points).
-3. **Behavioral Angles**: 2 traits they are looking for (e.g. adaptability, initiative, problem solving).
-4. **"Insider" Questions to Ask Them**: 3 brilliant, thoughtful questions to ask the interviewer.
+Generate an exhaustive, comprehensive, 360-degree Master Interview Preparation Guide in clean Markdown:
+1. **🏢 Company & Domain Context**: 1-sentence mission, core business products, and key architecture components.
+2. **🧪 Core Technical Competencies & Deep Dives**: Detailed explanation and talking points for:
+   - SDLC vs STLC, Test Design Techniques (BVA, ECP, Decision Tables), Bug Life Cycle (Severity vs Priority).
+   - Test Automation (Playwright/Selenium, PyTest fixtures, POM architecture).
+   - REST API Testing (HTTP methods, status codes, payload validation).
+   - SQL & DB verification queries (Joins, Aggregations, Data integrity checks).
+3. **💻 Real-World Domain Test Scenarios & Edge Cases**: 3 specific complex test scenarios relevant to this company's platform (e.g. login, streaming/workflows, checkout/payments).
+4. **🐍 High-Frequency Technical & Coding Challenges**: 3 Python coding/logic questions with concise solutions.
+5. **🗣️ Behavioral & Situational Questions (STAR Method)**: "Tell me about yourself", handling developer disagreements on bugs, and tight deadline prioritization.
+6. **💡 Strategic Reverse Questions**: 3 high-impact questions to ask the interviewer.
 
-Format using clean Markdown, bold headers, and bullet points. Be extremely concise.
-"""
+Format with clear markdown tables, code snippets, bold highlights, and clean typography."""
 
     try:
         result = call_llm(
@@ -110,7 +113,7 @@ Format using clean Markdown, bold headers, and bullet points. Be extremely conci
             force="local",
             pii_acknowledged=True,
             task_label=f"prep_sheet:{company_name}",
-            timeout_s=240,
+            timeout_s=300,
         )
         md_content = result.text
         if not md_content:
@@ -122,7 +125,7 @@ Format using clean Markdown, bold headers, and bullet points. Be extremely conci
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(md_content)
 
-        print(f"  ✅ Prep Sheet saved -> {file_path}")
+        print(f"  ✅ Comprehensive Prep Sheet saved -> {file_path}")
         return str(file_path)
     except Exception as e:
         print(f"  ❌ Ollama generation failed: {e}")

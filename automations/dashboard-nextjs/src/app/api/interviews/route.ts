@@ -13,7 +13,6 @@ export async function GET() {
     const interviews: any[] = [];
     const seenCompanies = new Set<string>();
 
-    // 1. Read all generated Markdown prep sheets
     if (fs.existsSync(prepDir)) {
       const files = fs.readdirSync(prepDir).filter(f => f.endsWith('.md'));
       
@@ -31,14 +30,13 @@ export async function GET() {
         const stats = fs.statSync(filePath);
         const content = fs.readFileSync(filePath, 'utf-8');
 
-        // Derive company name from filename e.g. "uncodemy_prep_sheet.md" -> "Uncodemy"
         const rawComp = file.replace(/_prep_sheet\.md$/i, '').replace(/_/g, ' ');
         const companyName = rawComp.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
         
         seenCompanies.add(companyName.toLowerCase());
 
         let jobInfo: any = {
-          title: 'Web Developer / Software Engineer',
+          title: 'Software Tester & Developer',
           location: 'Noida / Remote',
           portal: 'Naukri / Direct',
           url: '',
@@ -63,7 +61,6 @@ export async function GET() {
           }
         }
 
-        // Check for calendar file
         let icsFile = '';
         if (fs.existsSync(icsDir)) {
           const icsFiles = fs.readdirSync(icsDir).filter(f => f.endsWith('.ics'));
@@ -93,7 +90,6 @@ export async function GET() {
       }
     }
 
-    // Sort by latest update
     interviews.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
     return NextResponse.json({ interviews });
@@ -115,20 +111,25 @@ export async function POST(req: Request) {
       fs.mkdirSync(prepDir, { recursive: true });
     }
 
-    // Generate via local Ollama
-    const prompt = `You are an elite Silicon Valley interview coach.
-I have an interview with ${company} for the role of "${title || 'Developer'}".
+    const prompt = `You are an elite Silicon Valley technical interview coach and QA/Engineering Lead.
+I have an interview with ${company} for the role of "${title || 'Software Tester & QA Developer'}".
 
 Job Description / Notes:
-${description || 'Web / Software Developer role covering modern frontend (HTML/CSS/JS/React) and backend (Python/Django/REST APIs).'}
+${description || 'Software Tester / QA Automation Engineer & Python Developer (Manual testing, Playwright, PyTest, REST API testing, SQL queries, Python DSA, Bug Life Cycle, SDLC/STLC).'}
 
-Generate a strategic 1-page "Cheat Sheet":
-1. **Core Mission**: 1 sentence summary of what this role does.
-2. **Top 3 Technical Focus Areas**: Specific technical skills and questions.
-3. **Behavioral Strengths**: Key attributes to demonstrate.
-4. **Insider Questions to Ask**: 3 brilliant questions for the interviewer.
+Generate an exhaustive, comprehensive, 360-degree Master Interview Preparation Guide in clean Markdown:
+1. **🏢 Company & Domain Context**: 1-sentence mission, core business products, and key architecture components.
+2. **🧪 Core Technical Competencies & Deep Dives**: Detailed explanation and talking points for:
+   - SDLC vs STLC, Test Design Techniques (BVA, ECP, Decision Tables), Bug Life Cycle (Severity vs Priority).
+   - Test Automation (Playwright/Selenium, PyTest fixtures, POM architecture).
+   - REST API Testing (HTTP methods, status codes, payload validation).
+   - SQL & DB verification queries (Joins, Aggregations, Data integrity checks).
+3. **💻 Real-World Domain Test Scenarios & Edge Cases**: 3 specific complex test scenarios relevant to this company's platform.
+4. **🐍 High-Frequency Technical & Coding Challenges**: 3 Python coding/logic questions with concise solutions.
+5. **🗣️ Behavioral & Situational Questions (STAR Method)**: "Tell me about yourself", handling developer disagreements on bugs, and tight deadline prioritization.
+6. **💡 Strategic Reverse Questions**: 3 high-impact questions to ask the interviewer.
 
-Format using clean Markdown with bold headers and bullet points.`;
+Format with clear markdown tables, code snippets, bold highlights, and clean typography.`;
 
     const response = await fetch("http://127.0.0.1:11434/api/generate", {
       method: "POST",
