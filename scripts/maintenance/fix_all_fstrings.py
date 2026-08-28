@@ -1,6 +1,6 @@
 import re
 
-with open('/home/venu/Proposals/Jarvis/automations/alert_triggers.py', 'r') as f:
+with open('automations/alert_triggers.py', 'r') as f:
     content = f.read()
 
 # Fix all broken f-string concatenations
@@ -146,7 +146,7 @@ content = content.replace(old4_broken, old4)
 # Fix 5: ollama_unavailable block (exception version)
 old5_broken = '''message=f"Cannot connect to Ollama API.\n\n"
                     f"Error: {str(e)}\n"
-                    f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    f"Time: {timestamp}\n\n"
                     "This usually means Ollama is not running.\n\n"
                     "Immediate actions:\n"
                     "1. Start Ollama: systemctl --user start ollama\n"
@@ -158,7 +158,7 @@ old5_broken = '''message=f"Cannot connect to Ollama API.\n\n"
 new5 = '''message=(
                     "Cannot connect to Ollama API.{NL}{NL}"
                     f"Error: {str(e)}{NL}"
-                    f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{NL}{NL}"
+                    f"Time: {timestamp}{NL}{NL}"
                     "This usually means Ollama is not running.{NL}{NL}"
                     "Immediate actions:{NL}"
                     "1. Start Ollama: systemctl --user start ollama{NL}"
@@ -202,7 +202,7 @@ old6_broken2 = '''message=(
 
 content = content.replace(old6_broken2, old6_broken)
 
-with open('/home/venu/Proposals/Jarvis/automations/alert_triggers.py', 'w') as f:
+with open('automations/alert_triggers.py', 'w') as f:
     f.write(content)
 
 print('Fixed all broken f-string blocks')
