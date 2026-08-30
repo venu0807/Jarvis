@@ -120,11 +120,16 @@ def send_followup_email(job: dict) -> bool:
         return False
 
 
-def record_followup(conn, job: dict):
-    conn.execute("""
+def record_followups(conn, jobs: list):
+    if not jobs:
+        return
+
+    now = datetime.datetime.now().isoformat()
+    data = [(job["id"], job["company"], now) for job in jobs]
+    conn.executemany("""
         INSERT INTO followups (job_id, company, sent_at, status)
         VALUES (?, ?, ?, 'sent')
-    """, (job["id"], job["company"], datetime.datetime.now().isoformat()))
+    """, data)
     conn.commit()
 
 
@@ -143,10 +148,11 @@ def main():
     print(f"📋 Found {len(candidates)} applications due for follow-up")
 
     sent = 0
+    successful_jobs = []
     for job in candidates:
         print(f"  → {job['company']}: {job['title']}")
         if send_followup_email(job):
-            record_followup(conn, job)
+            successful_jobs.append(job)
             sent += 1
 
             # Telegram notification
@@ -157,6 +163,8 @@ def main():
                 notify_followup_sent(job["company"], job.get("url", ""))
             except Exception:
                 pass
+
+    record_followups(conn, successful_jobs)
 
     conn.close()
     print(f"✅ Done. Sent {sent}/{len(candidates)} follow-up emails.")
