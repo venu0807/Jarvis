@@ -76,14 +76,31 @@ def save_jobs_to_db(results: list[ApplicationResult]):
     now = datetime.datetime.now().isoformat()
     
     with sqlite3.connect(DB_PATH) as conn:
+        jobs_data = []
+        seen_jobs_data = []
         for r in results:
             job = r.job
             job_id = job.get("id", "")
             if not job_id:
                 continue
                 
+            jobs_data.append((
+                job_id,
+                job.get("title", ""),
+                job.get("company", ""),
+                job.get("location", ""),
+                job.get("portal", ""),
+                job.get("url", ""),
+                job.get("description", ""),
+                r.status,
+                getattr(r, "skip_reason", None) or getattr(r, "reason", None) or "",
+                now
+            ))
+            seen_jobs_data.append((job_id, now))
+
+        if jobs_data:
             try:
-                conn.execute("""
+                conn.executemany("""
                     INSERT INTO jobs (id, title, company, location, portal, url, description, status, skip_reason, timestamp)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET 
@@ -91,22 +108,25 @@ def save_jobs_to_db(results: list[ApplicationResult]):
                         skip_reason=COALESCE(excluded.skip_reason, jobs.skip_reason),
                         timestamp=excluded.timestamp,
                         description=CASE WHEN excluded.description != '' THEN excluded.description ELSE jobs.description END
-                """, (
-                    job_id,
-                    job.get("title", ""),
-                    job.get("company", ""),
-                    job.get("location", ""),
-                    job.get("portal", ""),
-                    job.get("url", ""),
-                    job.get("description", ""),
-                    r.status,
-                    getattr(r, "skip_reason", None) or getattr(r, "reason", None) or "",
-                    now
-                ))
-                # Also mark seen
-                conn.execute("INSERT OR IGNORE INTO seen_jobs (id, first_seen) VALUES (?, ?)", (job_id, now))
+                """, jobs_data)
+                conn.executemany("INSERT OR IGNORE INTO seen_jobs (id, first_seen) VALUES (?, ?)", seen_jobs_data)
             except Exception as e:
-                print(f"⚠️ Could not insert job {job_id} into DB: {e}")
+                # Fallback to individual inserts to preserve error handling per row
+                for job_data, seen_data in zip(jobs_data, seen_jobs_data):
+                    try:
+                        conn.execute("""
+                            INSERT INTO jobs (id, title, company, location, portal, url, description, status, skip_reason, timestamp)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(id) DO UPDATE SET
+                                status=excluded.status,
+                                skip_reason=COALESCE(excluded.skip_reason, jobs.skip_reason),
+                                timestamp=excluded.timestamp,
+                                description=CASE WHEN excluded.description != '' THEN excluded.description ELSE jobs.description END
+                        """, job_data)
+                        conn.execute("INSERT OR IGNORE INTO seen_jobs (id, first_seen) VALUES (?, ?)", seen_data)
+                    except Exception as inner_e:
+                        print(f"⚠️ Could not insert job {job_data[0]} into DB: {inner_e}")
+
         conn.commit()
 
     applied_results = [r for r in results if r.status == "applied"]
@@ -120,12 +140,14 @@ def save_jobs_to_db(results: list[ApplicationResult]):
                 host=os.getenv("PG_HOST", "127.0.0.1"),
             )
             pg_cur = pg_conn.cursor()
-            for r in applied_results:
-                job_payload = json.dumps(r.job)
-                pg_cur.execute(
+
+            pg_data = [("job_bot", "jobs.applied", json.dumps(r.job)) for r in applied_results]
+            if pg_data:
+                pg_cur.executemany(
                     "INSERT INTO events (source, event_type, payload) VALUES (%s, %s, %s)",
-                    ("job_bot", "jobs.applied", job_payload)
+                    pg_data
                 )
+
             pg_conn.commit()
             pg_cur.close()
             pg_conn.close()
