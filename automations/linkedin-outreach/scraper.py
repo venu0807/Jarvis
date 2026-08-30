@@ -25,6 +25,20 @@ CHECKPOINT_MAX_WAIT_S = 180      # SMS/email OTPs can take 2-3 min
 CHECKPOINT_POLL_S = 5
 
 
+def _wait_for_login(page, max_wait_s: int = 90) -> bool:
+    """Poll until LinkedIn manual login clears. Returns True when cleared."""
+    waited = 0
+    while waited < max_wait_s:
+        url = page.url
+        # If we are no longer on the login page (or related pages), we are good
+        if not any(seg in url for seg in ("login", "signup", "session/new")):
+            return True
+        page.wait_for_timeout(5000)
+        waited += 5
+        print(f"  ⏳ waiting for manual login, {waited}/{max_wait_s}s...")
+    print("  ⚠ manual login timed out")
+    return False
+
 def _wait_for_checkpoint(page, max_wait_s: int = CHECKPOINT_MAX_WAIT_S) -> bool:
     """Poll until LinkedIn checkpoint URL clears. Returns True when cleared."""
     waited = 0
@@ -129,12 +143,16 @@ def scrape_linkedin_posts(job_role):
                     except Exception as e:
                         print(f"Automated login failed or interrupted: {e}")
                         print("Please login manually in the browser window...")
-                        page.wait_for_timeout(90000)
+                        if not _wait_for_login(page):
+                            context.close()
+                            return posts_data
                 else:
                     print("No credentials provided in .env, please login manually.")
-                    page.wait_for_timeout(90000)
+                    if not _wait_for_login(page):
+                        context.close()
+                        return posts_data
 
-            # Fix #6 — polling-based checkpoint wait (was a flat 60s sleep)
+            # Polling-based checkpoint wait (was a flat 60s sleep)
             if any(seg in page.url for seg in ("/checkpoint", "/challenge", "/authwall")):
                 print("Security checkpoint detected. Please complete it manually.")
                 if not _wait_for_checkpoint(page):
