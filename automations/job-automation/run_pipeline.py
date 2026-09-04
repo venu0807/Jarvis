@@ -37,7 +37,7 @@ from shared_utils import setup_logging
 load_dotenv(BASE_DIR / ".env")
 
 try:
-    from telegram_notifier import notify_daily_summary, notify_crash
+    from telegram_notifier import notify_crash
     _TG = True
 except ImportError:
     _TG = False
