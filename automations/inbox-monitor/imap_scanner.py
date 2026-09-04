@@ -12,7 +12,6 @@ from email.message import EmailMessage
 import imaplib
 import time
 from pathlib import Path
-from datetime import datetime
 
 BASE_DIR = Path(__file__).parent
 sys.path.append(str(BASE_DIR.parent))
