@@ -8,9 +8,6 @@ Future Architecture Outline:
 4. Alerts on unexpected large expenses.
 """
 
-import sys
-import os
-
 def generate_financial_report():
     print("💰 [MOCK] Querying PostgreSQL for bot affiliate revenue...")
     print("💰 [MOCK] Fetching bank balances via Plaid API...")
