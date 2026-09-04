@@ -9,7 +9,6 @@ Future Architecture Outline:
 """
 
 import sys
-import os
 
 def generate_financial_report():
     print("💰 [MOCK] Querying PostgreSQL for bot affiliate revenue...")
