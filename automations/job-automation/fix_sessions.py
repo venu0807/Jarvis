@@ -8,7 +8,7 @@ from pathlib import Path
 def fix_session_path():
     """Ensure session directory uses correct path"""
     # Use the WSL path that we know exists
-    base_path = Path("/home/venu/.jarvis")
+    base_path = Path.home() / ".jarvis"
     sessions_path = base_path / "automations" / "job-automation" / ".sessions"
     sessions_path.mkdir(parents=True, exist_ok=True)
     return sessions_path
