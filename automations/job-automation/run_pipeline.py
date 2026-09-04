@@ -14,7 +14,6 @@ Run manually: python run_pipeline.py
 import asyncio
 import datetime
 import json
-import logging
 import os
 import subprocess
 import sys
