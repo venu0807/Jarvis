@@ -1,9 +1,10 @@
+import os
 import re
 
-with open('/home/venu/Proposals/Jarvis/automations/alert_triggers.py', 'r') as f:
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../automations/alert_triggers.py'), 'r') as f:
     content = f.read()
 
-# Fix the broken f-string concatenation in pg_isready block
+# This script fixes the broken f-string concatenation in pg_isready block
 old_block = '''message=f"JARVIS cannot connect to PostgreSQL database.\\n\\n"
                             f"Error: {result.stderr.strip()}\\n"
                             f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\\n\\n"
@@ -36,7 +37,7 @@ new_block = '''message=(
 
 content = content.replace(old_block, new_block)
 
-with open('/home/venu/Proposals/Jarvis/automations/alert_triggers.py', 'w') as f:
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../automations/alert_triggers.py'), 'w') as f:
     f.write(content)
 
 print('Fixed pg_isready block')
