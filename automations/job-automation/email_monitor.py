@@ -6,7 +6,6 @@ import os
 import time
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-import re
 try:
     from telegram_notifier import notify_interview, notify_rejection, notify_crash
     _TG = True
