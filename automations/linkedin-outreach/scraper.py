@@ -134,7 +134,7 @@ def scrape_linkedin_posts(job_role):
                     print("No credentials provided in .env, please login manually.")
                     page.wait_for_timeout(90000)
 
-            # Fix #6 — polling-based checkpoint wait (was a flat 60s sleep)
+            # Fixed #6 — polling-based checkpoint wait (was a flat 60s sleep)
             if any(seg in page.url for seg in ("/checkpoint", "/challenge", "/authwall")):
                 print("Security checkpoint detected. Please complete it manually.")
                 if not _wait_for_checkpoint(page):
