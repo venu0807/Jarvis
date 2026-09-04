@@ -12,7 +12,6 @@ The browser closes as soon as the page navigates away from the login page
 after you sign in — or press Enter here to capture immediately.
 """
 import asyncio
-import os
 import sys
 from pathlib import Path
 
