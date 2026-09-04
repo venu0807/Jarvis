@@ -3,7 +3,7 @@ import re
 with open('/home/venu/Proposals/Jarvis/automations/alert_triggers.py', 'r') as f:
     lines = f.readlines()
 
-# Fix broken f-string concatenations by joining consecutive f-string lines
+# This script fixes broken f-string concatenations by joining consecutive f-string lines
 # The pattern is:
 # message=f"...\n"
 #         f"...\n"
