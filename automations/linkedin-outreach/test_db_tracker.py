@@ -48,6 +48,23 @@ class TestSentTracker(unittest.TestCase):
         self.assertEqual(stats["per_tier"].get("T1"), 1)
         self.assertEqual(stats["per_role"].get("Python Developer"), 1)
 
+    def test_migrate_add_column_error_paths(self):
+        import sqlite3
+        from unittest.mock import MagicMock
+
+        # Test 1: Duplicate column name is ignored
+        mock_conn = MagicMock()
+        mock_conn.execute.side_effect = sqlite3.OperationalError("duplicate column name: tier")
+
+        # This should not raise an exception
+        self.tracker._migrate_add_column(mock_conn, "sent_emails", "tier", "TEXT DEFAULT 'T3'")
+
+        # Test 2: Other operational errors are raised
+        mock_conn.execute.side_effect = sqlite3.OperationalError("no such table: fake_table")
+
+        with self.assertRaises(sqlite3.OperationalError):
+            self.tracker._migrate_add_column(mock_conn, "fake_table", "tier", "TEXT DEFAULT 'T3'")
+
     def test_migration_from_v1_schema(self):
         """Simulate a v1 DB without tier/template_id columns, then init."""
         import sqlite3
@@ -201,7 +218,7 @@ class TestTemplates(unittest.TestCase):
         body = get_template("UNKNOWN_ID")
         # Should fall back to T2 (hiring manager DM)
         self.assertIn("{first_name}", body)
-        self.assertIn("MCA in AI/ML", body)
+        self.assertIn("MCA graduate", body)
         # T2 should mention portfolio or projects
         self.assertIn("github.com/venu0807", body)
 
