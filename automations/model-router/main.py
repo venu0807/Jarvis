@@ -15,7 +15,6 @@ from typing import Dict, List, Optional, Literal
 
 import httpx
 from fastapi import FastAPI, HTTPException, Header, Depends
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 # Import fastapi-health for health checks
