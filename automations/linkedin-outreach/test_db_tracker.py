@@ -180,6 +180,20 @@ class TestSentTracker(unittest.TestCase):
         self.assertTrue(self.tracker.already_sent_to("a@b.com"))
         self.assertFalse(self.tracker.already_sent_to("never@seen.com"))
 
+    def test_already_sent_to_days_cutoff(self):
+        # Insert a record sent 40 days ago
+        cutoff = (datetime.datetime.now() - datetime.timedelta(days=40)).isoformat()
+        with self.tracker._conn() as conn:
+            conn.execute(
+                "INSERT INTO sent_emails (recipient, role, sent_at) VALUES (?, ?, ?)",
+                ("old@example.com", "Role", cutoff),
+            )
+
+        # Checking default 30 days should be False since 40 days > 30
+        self.assertFalse(self.tracker.already_sent_to("old@example.com", days=30))
+        # Checking 50 days should be True since 40 days <= 50
+        self.assertTrue(self.tracker.already_sent_to("old@example.com", days=50))
+
 
 class TestTemplates(unittest.TestCase):
 
@@ -201,7 +215,7 @@ class TestTemplates(unittest.TestCase):
         body = get_template("UNKNOWN_ID")
         # Should fall back to T2 (hiring manager DM)
         self.assertIn("{first_name}", body)
-        self.assertIn("MCA in AI/ML", body)
+        self.assertIn("MCA graduate specializing in Software Engineering and AI/ML", body)
         # T2 should mention portfolio or projects
         self.assertIn("github.com/venu0807", body)
 
