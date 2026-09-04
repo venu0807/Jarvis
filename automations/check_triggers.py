@@ -9,7 +9,12 @@ logger = logging.getLogger(__name__)
 def check_postgresql():
     try:
         import psycopg2
-        conn = psycopg2.connect(host='localhost', port=5432, user='postgres', password='postgres', database='jarvis', connect_timeout=5)
+        host = os.getenv('JARVIS_DB_HOST', 'localhost')
+        port = int(os.getenv('JARVIS_DB_PORT', 5432))
+        user = os.getenv('JARVIS_DB_USER', 'postgres')
+        password = os.getenv('JARVIS_DB_PASS', 'postgres')
+        database = os.getenv('JARVIS_DB_NAME', 'jarvis')
+        conn = psycopg2.connect(host=host, port=port, user=user, password=password, database=database, connect_timeout=5)
         conn.close()
         return True, 'PostgreSQL is online'
     except ImportError:
