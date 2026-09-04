@@ -8,7 +8,6 @@ Usage:
 Uses TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID from the job-automation .env
 """
 import os
-import json
 import requests
 from datetime import datetime
 from pathlib import Path
