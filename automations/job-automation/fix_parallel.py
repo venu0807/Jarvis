@@ -1,5 +1,3 @@
-import re
-
 with open("/home/venu/Proposals/Jarvis/automations/job-automation/auto_applier.py", "r") as f:
     content = f.read()
 
