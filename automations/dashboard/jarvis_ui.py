@@ -54,11 +54,14 @@ try:
     conn = psycopg2.connect(**DB_PARAMS)
     cur = conn.cursor()
     
-    cur.execute("SELECT count(*) FROM events WHERE event_type = 'pinterest.pin_posted'")
-    pin_count = cur.fetchone()[0]
-    
-    cur.execute("SELECT count(*) FROM events WHERE event_type = 'jobs.applied'")
-    job_count = cur.fetchone()[0]
+    cur.execute("""
+        SELECT
+            COUNT(CASE WHEN event_type = 'pinterest.pin_posted' THEN 1 END),
+            COUNT(CASE WHEN event_type = 'jobs.applied' THEN 1 END)
+        FROM events
+        WHERE event_type IN ('pinterest.pin_posted', 'jobs.applied')
+    """)
+    pin_count, job_count = cur.fetchone()
     
     cur.execute("SELECT count(*) FROM memory_embeddings")
     memory_count = cur.fetchone()[0]
