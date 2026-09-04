@@ -6,7 +6,6 @@ Sends payloads to the N8N webhook securely.
 import os
 import sys
 import requests
-import json
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
