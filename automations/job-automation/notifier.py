@@ -8,7 +8,6 @@ notification channel. See ../README.md for the rationale.
 """
 import json
 import argparse
-import datetime
 import smtplib
 import os
 import sys
