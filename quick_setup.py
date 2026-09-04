@@ -15,7 +15,7 @@ def step(num, title, command=None):
     print(f"  Step {num}: {title}")
     print(f"{'='*60}")
     if command:
-        result = subprocess.run(command, shell=True, cwd=BASE)
+        result = subprocess.run(command, cwd=BASE)
         if result.returncode != 0:
             print(f"  ⚠️  Step {num} had issues. Check above.")
 
@@ -34,11 +34,11 @@ def main():
 
     # Step 1: Install Python deps
     step(1, "Installing Python dependencies (Playwright, Ollama client, etc.)",
-         f'"{py}" -m pip install -r automations/job-automation/requirements.txt')
+         [py, "-m", "pip", "install", "-r", "automations/job-automation/requirements.txt"])
 
     # Step 2: Install Playwright browsers
     step(2, "Installing Playwright browsers (Chromium ~150MB)",
-         f'"{py}" -m playwright install chromium')
+         [py, "-m", "playwright", "install", "chromium"])
 
     # Step 3: Check Ollama
     print(f"\n{'='*60}")
@@ -55,7 +55,7 @@ def main():
 
     # Step 4: Ensure Ollama model
     step(4, "Pulling AI model (phi4-mini ~2.5GB, first-time download)",
-         "ollama pull phi4-mini")
+         ["ollama", "pull", "phi4-mini"])
 
     # Step 5: Config
     print(f"\n{'='*60}")
