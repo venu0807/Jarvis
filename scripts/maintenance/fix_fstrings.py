@@ -10,7 +10,7 @@ if "NL = " not in content:
         "last_alerts = {}\n\n# Newline constant for f-strings (Python 3.12+ doesn't allow backslashes in f-string expressions)\nNL = \"\\n\""
     )
 
-# Fix f-strings: replace \n with {NL} inside f-strings
+# Replace \n with {NL} inside f-strings
 # Pattern: f"..." containing \n
 # We'll do a more careful replacement
 
