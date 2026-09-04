@@ -4,7 +4,6 @@ Logs into job portals and makes a superficial save (e.g. adding a space, or just
 to manipulate ATS systems into flagging the profile as "Recently Updated".
 """
 
-import os
 import sys
 import asyncio
 from pathlib import Path
