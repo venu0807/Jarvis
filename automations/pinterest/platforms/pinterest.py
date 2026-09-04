@@ -239,17 +239,19 @@ class PinterestPlatform(Platform):
             return {"error": "Analytics only available via API"}
         
         try:
-            import requests
+            import aiohttp
             headers = {"Authorization": f"Bearer {self.access_token}"}
-            resp = requests.get(
-                f"https://api.pinterest.com/v5/pins/{post_id}/analytics",
-                headers=headers,
-                params={"metrics": "IMPRESSION,SAVE,CLICKTHROUGH,ENGAGEMENT"},
-                timeout=10
-            )
-            if resp.status_code == 200:
-                return resp.json()
-            return {"error": resp.text}
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"https://api.pinterest.com/v5/pins/{post_id}/analytics",
+                    headers=headers,
+                    params={"metrics": "IMPRESSION,SAVE,CLICKTHROUGH,ENGAGEMENT"},
+                    timeout=10
+                ) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
+                    error_text = await resp.text()
+                    return {"error": error_text}
         except Exception as e:
             return {"error": str(e)}
     
