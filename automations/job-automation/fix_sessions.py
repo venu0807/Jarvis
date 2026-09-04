@@ -1,7 +1,6 @@
 # This is a patch to fix the path issue in auto_applier.py
 # The issue is that the script is trying to access Windows paths that don't exist in the WSL/Linux-like environment
 
-import os
 from pathlib import Path
 
 # Fix the session directory path to use the correct WSL path
