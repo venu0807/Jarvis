@@ -41,6 +41,20 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+def is_wsl() -> bool:
+    import os, platform
+    if 'microsoft-standard' in platform.release().lower() or 'wsl' in platform.release().lower():
+        return True
+    if 'WSL_DISTRO_NAME' in os.environ:
+        return True
+    try:
+        with open('/proc/version', 'r') as f:
+            if 'microsoft' in f.read().lower():
+                return True
+    except Exception:
+        pass
+    return False
+
 # Add parent directory to path to import shared_vision
 sys.path.append(str(Path(__file__) / "automations"))
 try:
@@ -207,16 +221,29 @@ class AsyncBrowser:
             print(f"  ⚠ Connection refused. Auto-launching Jarvis Edge on Windows...")
             import asyncio
             try:
-                # Kill existing Edge processes before starting a new debugging session
-                kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
-                proc1 = await asyncio.create_subprocess_shell(kill_cmd, stderr=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL)
-                await proc1.communicate()
-                await asyncio.sleep(2)
-                
-                cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
-                proc2 = await asyncio.create_subprocess_shell(cmd)
-                await proc2.communicate()
-                await asyncio.sleep(6) # Wait for Edge to fully open and start CDP server
+                import os
+
+                # Terminate existing Edge processes before starting a new debugging session
+                if is_wsl():
+                    kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
+                    proc1 = await asyncio.create_subprocess_shell(kill_cmd, stderr=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL)
+                    await proc1.communicate()
+                    await asyncio.sleep(2)
+                    cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
+                    proc2 = await asyncio.create_subprocess_shell(cmd)
+                    await proc2.communicate()
+                    await asyncio.sleep(6)
+                elif os.name == 'nt':
+                    kill_cmd = 'taskkill.exe /F /IM msedge.exe'
+
+                    proc1 = await asyncio.create_subprocess_shell(kill_cmd, stderr=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL)
+                    await proc1.communicate()
+                    await asyncio.sleep(2)
+
+                    cmd = 'powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
+                    proc2 = await asyncio.create_subprocess_shell(cmd)
+                    await proc2.communicate()
+                    await asyncio.sleep(6)
                 
                 self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url, timeout=10000)
                 print("  ✅ Successfully auto-launched and connected!")
@@ -372,14 +399,25 @@ class SyncBrowser:
             import subprocess
             import time
             try:
-                # Kill existing Edge processes before starting a new debugging session
-                kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
-                subprocess.run(kill_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-                time.sleep(2)
-                
-                cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
-                subprocess.run(cmd, shell=True)
-                time.sleep(6) # Wait for Edge to fully open and start CDP server
+                import os
+
+                # Terminate existing Edge processes before starting a new debugging session
+                if is_wsl():
+                    kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
+
+                    subprocess.run(kill_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                    time.sleep(2)
+                    cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
+                    subprocess.run(cmd, shell=True)
+                    time.sleep(6)
+                elif os.name == 'nt':
+                    kill_cmd = 'taskkill.exe /F /IM msedge.exe'
+
+                    subprocess.run(kill_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                    time.sleep(2)
+                    cmd = 'powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
+                    subprocess.run(cmd, shell=True)
+                    time.sleep(6)
                 
                 browser = self._playwright.chromium.connect_over_cdp(cdp_url, timeout=10000)
                 print("  ✅ Successfully auto-launched and connected!")
@@ -415,14 +453,25 @@ class SyncBrowser:
             import subprocess
             import time
             try:
-                # Kill existing Edge processes before starting a new debugging session
-                kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
-                subprocess.run(kill_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-                time.sleep(2)
-                
-                cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
-                subprocess.run(cmd, shell=True)
-                time.sleep(6) # Wait for Edge to fully open and start CDP server
+                import os
+
+                # Terminate existing Edge processes before starting a new debugging session
+                if is_wsl():
+                    kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
+
+                    subprocess.run(kill_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                    time.sleep(2)
+                    cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
+                    subprocess.run(cmd, shell=True)
+                    time.sleep(6)
+                elif os.name == 'nt':
+                    kill_cmd = 'taskkill.exe /F /IM msedge.exe'
+
+                    subprocess.run(kill_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                    time.sleep(2)
+                    cmd = 'powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
+                    subprocess.run(cmd, shell=True)
+                    time.sleep(6)
                 
                 self._browser = self._playwright.chromium.connect_over_cdp(cdp_url, timeout=10000)
                 print("  ✅ Successfully auto-launched and connected!")
