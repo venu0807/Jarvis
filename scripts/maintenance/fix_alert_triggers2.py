@@ -1,9 +1,9 @@
 import re
 
-with open('/home/venu/Proposals/Jarvis/automations/alert_triggers.py', 'r') as f:
+with open('automations/alert_triggers.py', 'r') as f:
     content = f.read()
 
-# Fix the broken f-string concatenation in pg_isready block using regex
+# Corrects the broken f-string concatenation in pg_isready block using regex
 # Match the pattern: message=f"..." followed by multiple f"..." lines ending with a comma
 pattern = r'''(message=)f"JARVIS cannot connect to PostgreSQL database\.\n\n"
                             f"Error: \{result\.stderr\.strip\(\)\}\n"
@@ -37,7 +37,7 @@ replacement = r'''\1(
 
 content = re.sub(pattern, replacement, content, flags=re.DOTALL)
 
-with open('/home/venu/Proposals/Jarvis/automations/alert_triggers.py', 'w') as f:
+with open('automations/alert_triggers.py', 'w') as f:
     f.write(content)
 
 print('Fixed pg_isready block via regex')
