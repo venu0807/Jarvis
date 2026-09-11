@@ -36,14 +36,15 @@ class PinterestPlatform(Platform):
         if self.use_api:
             # Test API token with a simple request
             try:
-                import requests
+                import aiohttp
                 headers = {"Authorization": f"Bearer {self.access_token}"}
-                resp = requests.get(
-                    "https://api.pinterest.com/v5/user_account",
-                    headers=headers,
-                    timeout=10
-                )
-                return resp.status_code == 200
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        "https://api.pinterest.com/v5/user_account",
+                        headers=headers,
+                        timeout=10
+                    ) as resp:
+                        return resp.status == 200
             except Exception:
                 return False
         # Browser mode - check if we can launch browser
