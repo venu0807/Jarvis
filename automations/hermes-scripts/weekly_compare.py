@@ -170,13 +170,24 @@ def main():
         # Match: portal_map = { ... } — only top-level {...}, not the {args.portal: ...} re-assignment
         # We'll do a string replace on specific portal lines
         n_disabled = 0
-        for portal in disable_list:
-            line_old = re.compile(rf'^(\s*)"{re.escape(portal)}":\s+[A-Za-z]+\w*Portal,', re.MULTILINE)
-            new_text, n = line_old.subn(rf'\1# "{portal}": DISABLED (weekly_compare.py {datetime.now().date()})', text)
-            if n > 0:
-                text = new_text
-                n_disabled += n
+
+        if disable_list:
+            portals_pattern = "|".join(map(re.escape, disable_list))
+            line_old = re.compile(rf'^(\s*)"({portals_pattern})":\s+[A-Za-z]+\w*Portal,', re.MULTILINE)
+
+            today_str = datetime.now().date()
+            portal_counts = defaultdict(int)
+
+            def repl(m):
+                portal = m.group(2)
+                portal_counts[portal] += 1
+                return f'{m.group(1)}# "{portal}": DISABLED (weekly_compare.py {today_str})'
+
+            text, n_disabled = line_old.subn(repl, text)
+
+            for portal, n in portal_counts.items():
                 print(f"  ✂️  Commented {n} entries for {portal}")
+
         if n_disabled > 0:
             aa.write_text(text, encoding="utf-8")
             print(f"\n✅ Wrote {n_disabled} disabled portal lines to auto_applier.py")
