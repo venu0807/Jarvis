@@ -236,7 +236,7 @@ def main():
                     last_rotated = last_date.strftime('%Y-%m-%d')
                     days_since = (datetime.now() - last_date).days
                     status = f"Due in {max(0, days - days_since)} days" if days_since < days else "OVERDUE"
-                except:
+                except Exception:
                     status = "Invalid date"
             else:
                 status = "NEVER ROTATED"
@@ -260,7 +260,7 @@ def main():
                         last_date = datetime.fromisoformat(last_rotated)
                         days_since = (datetime.now() - last_date).days
                         print(f"  • {secret} (last rotated {days_since} days ago, policy: {days} days)")
-                    except:
+                    except Exception:
                         print(f"  • {secret} (policy: {days} days)")
                 else:
                     print(f"  • {secret} (never rotated, policy: {days} days)")
