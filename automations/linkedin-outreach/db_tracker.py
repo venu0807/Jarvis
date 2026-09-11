@@ -122,6 +122,12 @@ class SentTracker:
 
     def _migrate_add_column(self, conn, table: str, column: str, definition: str) -> None:
         """Add a column to an existing table if it doesn't exist (safe migration)."""
+        import re
+        if not re.match(r'^[a-zA-Z0-9_]+$', table):
+            raise ValueError(f"Invalid table name: {table}")
+        if not re.match(r'^[a-zA-Z0-9_]+$', column):
+            raise ValueError(f"Invalid column name: {column}")
+
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
             # Only print during actual migrations, not during tests
