@@ -10,6 +10,7 @@ import re
 import requests
 import xml.etree.ElementTree as ET
 from pathlib import Path
+import itertools
 
 # Route via JARVIS chokepoint.
 try:
@@ -32,10 +33,10 @@ def get_company_news(company_name: str) -> str:
         if res.status_code == 200:
             root = ET.fromstring(res.text)
             news_items = []
-            for item in root.findall(".//item")[:4]:
-                title = item.find("title").text
-                pubDate = item.find("pubDate").text
-                if " - " in title:
+            for item in itertools.islice(root.iter("item"), 4):
+                title = item.findtext("title")
+                pubDate = item.findtext("pubDate")
+                if title and " - " in title:
                     title = title.rsplit(" - ", 1)[0]
                 news_items.append(f"  - {title} ({pubDate})")
             if news_items:
