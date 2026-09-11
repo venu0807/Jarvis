@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 
 const ALERTS_FILE = '/home/venu/Proposals/Jarvis/logs/alerts.json';
 const ALERT_MANAGER = '/home/venu/Proposals/Jarvis/alert_manager.py';
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const { action } = await req.json();
     if (action === 'clear') {
       await new Promise((resolve, reject) => {
-        exec(`python3 ${ALERT_MANAGER} clear`, (err, stdout, stderr) => {
+        execFile('python3', [ALERT_MANAGER, 'clear'], (err, stdout, stderr) => {
           if (err) reject(err);
           else resolve(stdout);
         });
