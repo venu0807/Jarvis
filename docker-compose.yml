@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: jarvis
       POSTGRES_USER: jarvis
-      POSTGRES_PASSWORD: ${JARVIS_DB_PASS:-jarvis}
+      POSTGRES_PASSWORD: ${JARVIS_DB_PASS}
     volumes:
     - postgres_data:/var/lib/postgresql/data
     - ./init-scripts:/docker-entrypoint-initdb.d
@@ -28,7 +28,7 @@ services:
     container_name: jarvis-job-auto
     env_file: ./automations/job-automation/.env
     environment:
-    - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS:-jarvis}@postgres:5432/jarvis
+    - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS}@postgres:5432/jarvis
     - OLLAMA_HOST=http://host.docker.internal:11434
     depends_on:
       postgres:
@@ -45,7 +45,7 @@ services:
     container_name: jarvis-pinterest
     env_file: ./automations/pinterest/.env
     environment:
-    - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS:-jarvis}@postgres:5432/jarvis
+    - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS}@postgres:5432/jarvis
     - OLLAMA_HOST=http://host.docker.internal:11434
     depends_on:
       postgres:
@@ -61,7 +61,7 @@ services:
       dockerfile: Dockerfile
     container_name: jarvis-model-router
     environment:
-    - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS:-jarvis}@postgres:5432/jarvis
+    - DATABASE_URL=postgresql://jarvis:${JARVIS_DB_PASS}@postgres:5432/jarvis
     - OLLAMA_HOST=http://host.docker.internal:11434
     - MODEL_ROUTER_API_KEY=${MODEL_ROUTER_API_KEY:-changeme}
     depends_on:
