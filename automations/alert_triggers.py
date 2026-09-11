@@ -86,7 +86,7 @@ def check_job_apply_count():
                         zero_apply_runs += 1
                     else:
                         zero_apply_runs = 0  # Reset if we find non-zero
-            except:
+            except Exception:
                 continue
 
         if zero_apply_runs >= 2:
