@@ -123,7 +123,7 @@ class AlertManager:
             try:
                 with open(history_file) as f:
                     return json.load(f)
-            except:
+            except Exception:
                 return []
         return []
 
