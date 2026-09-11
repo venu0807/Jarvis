@@ -3,6 +3,7 @@ import sys
 import argparse
 import requests
 import psycopg2
+from psycopg2.extras import execute_values
 from pathlib import Path
 from datetime import datetime
 
@@ -55,6 +56,8 @@ def index_project(project_path: str):
     files_indexed = 0
     chunks_indexed = 0
 
+    records_to_insert = []
+
     for root, dirs, files in os.walk(path):
         # Ignore clutter
         dirs[:] = [d for d in dirs if d not in ('.git', '__pycache__', 'node_modules', 'venv', 'env', '.vscode', 'output', 'drafts', 'logs', 'prep_sheets')]
@@ -76,10 +79,7 @@ def index_project(project_path: str):
                         
                         embedding = get_embedding(context_text)
                         if embedding:
-                            cur.execute("""
-                                INSERT INTO memory_embeddings (content, embedding)
-                                VALUES (%s, %s::vector)
-                            """, (context_text, embedding))
+                            records_to_insert.append((context_text, embedding))
                             chunks_indexed += 1
                             
                     files_indexed += 1
@@ -89,6 +89,18 @@ def index_project(project_path: str):
                     pass # Skip binary or weirdly encoded files
                 except Exception as e:
                     print(f"  ❌ Failed to index {rel_path}: {e}")
+
+    if records_to_insert:
+        execute_values(
+            cur,
+            """
+            INSERT INTO memory_embeddings (content, embedding)
+            VALUES %s
+            """,
+            records_to_insert,
+            template="(%s, %s::vector)",
+            page_size=1000
+        )
 
     conn.commit()
     conn.close()
