@@ -28,6 +28,15 @@ class WebhookHandler(http.server.SimpleHTTPRequestHandler):
         
         response = {"status": "success", "message": "Bot triggered"}
 
+        content_length = int(self.headers.get('Content-Length', 0))
+        payload = {}
+        if content_length > 0:
+            try:
+                post_data = self.rfile.read(content_length)
+                payload = json.loads(post_data.decode('utf-8'))
+            except Exception:
+                pass
+
         if self.path == '/run/pinterest':
             print("🚀 TRIGGER RECEIVED: Starting Pinterest Bot...")
             # Run asynchronously so the UI button doesn't freeze waiting for the bot to finish
@@ -36,9 +45,11 @@ class WebhookHandler(http.server.SimpleHTTPRequestHandler):
             subprocess.Popen(cmd, cwd=PINTEREST_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             response["message"] = "Pinterest Bot started in the background"
 
-        elif self.path == '/run/linkedin':
+        elif self.path == '/run/linkedin' or payload.get('type') == 'linkedin':
             print("🚀 TRIGGER RECEIVED: Starting LinkedIn Bot...")
             cmd = ["python3", "main.py"]
+            if 'company' in payload:
+                cmd.extend(["--target-company", str(payload['company'])])
             subprocess.Popen(cmd, cwd=LINKEDIN_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             response["message"] = "LinkedIn Bot started in the background"
             
