@@ -1,5 +1,4 @@
 import asyncio
-from typing import Optional
 from playwright.async_api import Page, TimeoutError
 
 from .base import BasePortal, ApplicationResult
