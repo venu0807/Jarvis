@@ -1,6 +1,4 @@
-import requests
 import hashlib
-import re
 
 title = '🚨 PostgreSQL Connection Failed'
 message = 'This is a test of JARVIS PostgreSQL alert with emoji 🚨 in title'
