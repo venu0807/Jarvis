@@ -1,5 +1,4 @@
 import os
-import json
 from database import get_products_df
 
 def generate_dashboard():
