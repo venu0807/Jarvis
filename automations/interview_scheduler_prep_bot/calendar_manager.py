@@ -1,6 +1,5 @@
 """calendar_manager.py — Generate standard .ics calendar invite and alert for interviews."""
 
-import os
 import datetime
 from pathlib import Path
 
