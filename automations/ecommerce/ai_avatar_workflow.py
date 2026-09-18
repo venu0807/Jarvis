@@ -1,8 +1,3 @@
-import os
-import sys
-import json
-from pathlib import Path
-
 # This script is a placeholder to begin connecting Gemini Pro script generation 
 # with HeyGen/ElevenLabs for automated e-commerce video production.
 
