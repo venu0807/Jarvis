@@ -131,14 +131,12 @@ ollama list
 # ========================================
 # T3: Fix PostgreSQL init script path
 # ========================================
-log_info "T3: Fixing PostgreSQL init script path in docker-compose.yml..."
-# The docker-compose.yml already has the correct path: ./init-scripts:/docker-entrypoint-initdb.d
-# Just verify the init script exists
-if [ -f "$PROJECT_ROOT/init-scripts/01-init.sql" ]; then
-    log_info "Init script exists at init-scripts/01-init.sql"
-else
-    log_error "Init script not found!"
-fi
+    # T3: Fix PostgreSQL init script path
+    if [ -f "docker-compose.yml" ]; then
+        log_info "T3: Fixing PostgreSQL init script path in docker-compose.yml..."
+        # Update volume mount for postgres init script
+        sed -i 's|\./init-scripts/init-db\.sh:/docker-entrypoint-initdb\.d/init-db\.sh|\./init-scripts:/docker-entrypoint-initdb\.d|' docker-compose.yml
+    fi
 
 # ========================================
 # T6: .wslconfig already created above
