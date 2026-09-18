@@ -1,5 +1,4 @@
 import pytest
-import os
 from pathlib import Path
 
 def test_credentials_exist():
