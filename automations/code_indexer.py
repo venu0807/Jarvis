@@ -3,6 +3,7 @@ import sys
 import argparse
 import requests
 import psycopg2
+from psycopg2.extras import execute_values
 from pathlib import Path
 from datetime import datetime
 
@@ -54,6 +55,7 @@ def index_project(project_path: str):
 
     files_indexed = 0
     chunks_indexed = 0
+    records = []
 
     for root, dirs, files in os.walk(path):
         # Ignore clutter
@@ -76,10 +78,7 @@ def index_project(project_path: str):
                         
                         embedding = get_embedding(context_text)
                         if embedding:
-                            cur.execute("""
-                                INSERT INTO memory_embeddings (content, embedding)
-                                VALUES (%s, %s::vector)
-                            """, (context_text, embedding))
+                            records.append((context_text, embedding))
                             chunks_indexed += 1
                             
                     files_indexed += 1
@@ -89,6 +88,12 @@ def index_project(project_path: str):
                     pass # Skip binary or weirdly encoded files
                 except Exception as e:
                     print(f"  ❌ Failed to index {rel_path}: {e}")
+
+    if records:
+        execute_values(cur, """
+            INSERT INTO memory_embeddings (content, embedding)
+            VALUES %s
+        """, records, template="(%s, %s::vector)")
 
     conn.commit()
     conn.close()
