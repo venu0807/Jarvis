@@ -106,12 +106,7 @@ def section_pipeline():
 
 def section_recruiter():
     """Check for recruiter emails since last report (last 12h)."""
-    try:
-        from email_listener_auditor import audit_emails
-        # fallback: just count from log
-        log_path = Path.home() / "AppData" / "Local" / "hermes" / "jobhunt" / "detections_log.json"
-    except ImportError:
-        log_path = Path.home() / "AppData" / "Local" / "hermes" / "jobhunt" / "detections_log.json"
+    log_path = Path.home() / "AppData" / "Local" / "hermes" / "jobhunt" / "detections_log.json"
     if not log_path.exists():
         return {"count": 0, "items": []}
     try:
