@@ -10,6 +10,8 @@ import sys
 import os
 import json
 import psycopg2
+import asyncio
+import aiohttp
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
@@ -23,13 +25,27 @@ except ImportError:
         "host": "127.0.0.1"
     }
 
-# Removed SentenceTransformers import since we are using Ollama API now.
+async def fetch_embedding(session, memory_text, semaphore):
+    async with semaphore:
+        async with session.post(
+            "http://localhost:11434/api/embeddings",
+            json={"model": "nomic-embed-text:latest", "prompt": memory_text}
+        ) as response:
+            data = await response.json()
+            return data["embedding"]
+
+async def fetch_all_embeddings(memory_texts):
+    # Limit concurrency to 5 requests at a time to not overload Ollama
+    semaphore = asyncio.Semaphore(5)
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_embedding(session, text, semaphore) for text in memory_texts]
+        return await asyncio.gather(*tasks)
 
 def update_memory_graph():
     print("🧠 [Hermes Memory] Starting Vector DB Sync...")
     
-    import requests
-    
+    conn = None
+    cur = None
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
@@ -45,11 +61,9 @@ def update_memory_graph():
 
         print(f"  📥 Found {len(recent_events)} recent events. Generating embeddings...")
         
-        memorized_count = 0
+        # Collect items to memorize
+        items_to_memorize = []
         for event_id, event_type, payload, created_at in recent_events:
-            # Check if we already memorized this event (using a simple metadata check)
-            # Wait, earlier I recreated the table without the metadata column to make it simpler, but let's check if it has metadata.
-            # Actually, the recreate command was: `CREATE TABLE memory_embeddings (id SERIAL PRIMARY KEY, event_id INTEGER REFERENCES events(id), content TEXT, embedding vector(768))`
             cur.execute("SELECT id FROM memory_embeddings WHERE event_id = %s", (event_id,))
             if cur.fetchone():
                 continue # Already memorized
@@ -68,26 +82,37 @@ def update_memory_graph():
                     memory_text += f" Details: {payload}"
                     
             print(f"  💭 Memorizing: '{memory_text}'")
+            items_to_memorize.append({
+                "event_id": event_id,
+                "memory_text": memory_text
+            })
             
-            # 3. Generate 768D Vector Embedding (Locally, zero-leak!) using Ollama
-            r = requests.post("http://localhost:11434/api/embeddings", json={"model": "nomic-embed-text:latest", "prompt": memory_text})
-            embedding = r.json()["embedding"]
+        if items_to_memorize:
+            # 3. Generate 768D Vector Embedding (Locally, zero-leak!) using Ollama concurrently
+            memory_texts = [item["memory_text"] for item in items_to_memorize]
+            embeddings = asyncio.run(fetch_all_embeddings(memory_texts))
             
             # 4. Insert into pgvector
-            cur.execute(
-                "INSERT INTO memory_embeddings (content, embedding, event_id) VALUES (%s, %s, %s)",
-                (memory_text, embedding, event_id)
-            )
-            memorized_count += 1
+            memorized_count = 0
+            for item, embedding in zip(items_to_memorize, embeddings):
+                cur.execute(
+                    "INSERT INTO memory_embeddings (content, embedding, event_id) VALUES (%s, %s, %s)",
+                    (item["memory_text"], embedding, item["event_id"])
+                )
+                memorized_count += 1
+
+            conn.commit()
+            print(f"✅ [Hermes Memory] Sync Complete. Permanently stored {memorized_count} new memories in pgvector.")
+        else:
+            print("  ℹ️  No new events to memorize.")
             
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        print(f"✅ [Hermes Memory] Sync Complete. Permanently stored {memorized_count} new memories in pgvector.")
-        
     except Exception as e:
         print(f"❌ [Hermes Memory] Sync failed: {e}")
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 if __name__ == "__main__":
     update_memory_graph()
