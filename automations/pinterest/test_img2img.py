@@ -4,7 +4,11 @@ import requests
 import sys
 
 def test_img2img(img_path, out_path):
-    api_key = "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"
+    api_key = os.environ.get("NVIDIA_API_KEY")
+    if not api_key:
+        print("Error: NVIDIA_API_KEY environment variable is not set.", file=sys.stderr)
+        sys.exit(1)
+
     url = "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-xl-base-1.0"
     # wait, sd-xl image-to-image requires a different endpoint or payload
     # Let's try the requests way for NIM.
