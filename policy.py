@@ -290,6 +290,36 @@ def warn_on_legacy_openclaw_path(path: str | os.PathLike) -> None:
         raise RuntimeError(msg)
 
 
+def _scan_legacy_projects(legacy_workspace: Path) -> list[str]:
+    """Finds remaining projects in the legacy workspace."""
+    legacy_projects_remaining = []
+    if legacy_workspace.exists():
+        # Anything that looks like an automation project (has run.py or cron.yaml
+        # at top level) under .openclaw/workspace/ is a regression.
+        for child in legacy_workspace.iterdir():
+            if child.is_dir() and any((child / marker).exists()
+                                      for marker in ("run.py", "cron.yaml")):
+                legacy_projects_remaining.append(child.name)
+    return legacy_projects_remaining
+
+
+def _scan_legacy_refs_in_source(automations_root: Path) -> list[tuple[str, int, str]]:
+    """Finds legacy path references in automation source files."""
+    legacy_refs = []
+    if automations_root.exists():
+        for py in automations_root.rglob("*.py"):
+            if "__pycache__" in py.parts:
+                continue
+            try:
+                text = py.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            for n, line in enumerate(text.splitlines(), 1):
+                if "openclaw/workspace" in line or "openclaw\\workspace" in line:
+                    legacy_refs.append((str(py), n, line.strip()))
+    return legacy_refs
+
+
 def audit_workspace_layout() -> dict:
     """
     One-shot scan of ~/.jarvis/automations/ and ~/.openclaw/workspace/ used by
@@ -309,31 +339,9 @@ def audit_workspace_layout() -> dict:
     """
     automations_root = JARVIS_HOME / "automations"
     strict = POLICY.get("strict_workspace_layout", False)
-    legacy_projects_remaining = []
-    legacy_refs = []
 
-    # 1. Are there project directories under the legacy tree?
-    if LEGACY_OPENCLAW_WORKSPACE.exists():
-        # Anything that looks like an automation project (has run.py or cron.yaml
-        # at top level) under .openclaw/workspace/ is a regression.
-        for child in LEGACY_OPENCLAW_WORKSPACE.iterdir():
-            if child.is_dir() and any((child / marker).exists()
-                                      for marker in ("run.py", "cron.yaml")):
-                legacy_projects_remaining.append(child.name)
-
-    # 2. Are there still hardcoded openclaw/workspace references in
-    #    jarvis/automations source?
-    if automations_root.exists():
-        for py in automations_root.rglob("*.py"):
-            if "__pycache__" in py.parts:
-                continue
-            try:
-                text = py.read_text(encoding="utf-8", errors="ignore")
-            except OSError:
-                continue
-            for n, line in enumerate(text.splitlines(), 1):
-                if "openclaw/workspace" in line or "openclaw\\workspace" in line:
-                    legacy_refs.append((str(py), n, line.strip()))
+    legacy_projects_remaining = _scan_legacy_projects(LEGACY_OPENCLAW_WORKSPACE)
+    legacy_refs = _scan_legacy_refs_in_source(automations_root)
 
     ok = (not legacy_projects_remaining) and (not legacy_refs)
     return {
