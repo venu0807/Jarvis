@@ -3,7 +3,6 @@
 Jarvis Quick Setup — guided setup for ₹15k service clients.
 Run: python quick_setup.py
 """
-import os
 import subprocess
 import sys
 from pathlib import Path
