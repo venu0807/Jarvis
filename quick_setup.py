@@ -19,44 +19,49 @@ def step(num, title, command=None):
         if result.returncode != 0:
             print(f"  ⚠️  Step {num} had issues. Check above.")
 
-def main():
+def print_welcome():
     print("""
     🦞 JARVIS QUICK SETUP
     =====================
     This will install everything needed to run job automation.
     """)
-
     input("Press Enter to start setup (laptop must have 8GB+ RAM)...")
 
-    # Python version
-    py = sys.executable
+def install_dependencies(py):
     print(f"  Using Python: {py}")
-
     # Step 1: Install Python deps
     step(1, "Installing Python dependencies (Playwright, Ollama client, etc.)",
          f'"{py}" -m pip install -r automations/job-automation/requirements.txt')
-
     # Step 2: Install Playwright browsers
     step(2, "Installing Playwright browsers (Chromium ~150MB)",
          f'"{py}" -m playwright install chromium')
 
+def check_ollama():
     # Step 3: Check Ollama
     print(f"\n{'='*60}")
     print("  Step 3: Checking Ollama")
     print(f"{'='*60}")
-    ollama_check = subprocess.run(["ollama", "--version"], capture_output=True, text=True)
-    if ollama_check.returncode == 0:
-        print(f"  ✅ Ollama found: {ollama_check.stdout.strip()}")
-    else:
+    try:
+        ollama_check = subprocess.run(["ollama", "--version"], capture_output=True, text=True)
+        if ollama_check.returncode == 0:
+            print(f"  ✅ Ollama found: {ollama_check.stdout.strip()}")
+        else:
+            print("  ⚠️  Ollama not found.")
+            print("  Download from: https://ollama.com/download")
+            print("  After installing, run: ollama pull phi4-mini")
+            input("  Press Enter after installing Ollama...")
+    except FileNotFoundError:
         print("  ⚠️  Ollama not found.")
         print("  Download from: https://ollama.com/download")
         print("  After installing, run: ollama pull phi4-mini")
         input("  Press Enter after installing Ollama...")
 
+def ensure_model():
     # Step 4: Ensure Ollama model
     step(4, "Pulling AI model (phi4-mini ~2.5GB, first-time download)",
          "ollama pull phi4-mini")
 
+def setup_configuration():
     # Step 5: Config
     print(f"\n{'='*60}")
     print("  Step 5: Configuration")
@@ -70,6 +75,7 @@ def main():
     print()
     input("  Press Enter after configuring .env...")
 
+def print_completion():
     # Step 6: Test run
     print(f"\n{'='*60}")
     print("  Setup complete! Ready for test run.")
@@ -83,6 +89,18 @@ def main():
     print(f'    cd {BASE}')
     print('    python automations/job-automation/auto_applier.py')
     print()
+
+def main():
+    print_welcome()
+
+    # Python version
+    py = sys.executable
+    install_dependencies(py)
+
+    check_ollama()
+    ensure_model()
+    setup_configuration()
+    print_completion()
 
 if __name__ == "__main__":
     main()
