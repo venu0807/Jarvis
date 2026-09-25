@@ -176,52 +176,68 @@ def scrape_linkedin_posts(job_role):
 
             # Cap at 8 per role (was hardcoded [:5]) — still safe but a bit more headroom
             max_posts = int(os.environ.get("MAX_POSTS_PER_ROLE", "8"))
-            for idx, post in enumerate(post_elements[:max_posts]):
-                # Humanise the per-post delay
-                page.wait_for_timeout(int(random.randint(1500, 3500)))
-                try:
-                    raw_text = post.inner_text()
-                    if not raw_text.strip():
-                        continue
-                    # Backoff every 3 posts to look more human
-                    if idx > 0 and idx % 3 == 0:
-                        page.wait_for_timeout(int(random.randint(4000, 9000)))
 
-                    lines = [line.strip() for line in raw_text.split('\n') if line.strip()]
-                    if lines and lines[0] == "Feed post":
-                        lines = lines[1:]
-                    if len(lines) < 3:
-                        continue
+            # Batch extraction via page.evaluate to fix N+1 query and remove inefficient synchronous loop delays
+            # We wait once before evaluating to ensure elements are hydrated.
+            page.wait_for_timeout(int(random.randint(1500, 3500)))
 
-                    name = lines[0].split('•')[0].strip()
-                    company_or_headline = lines[1]
+            try:
+                # Pass the already selected elements to JS evaluate
+                posts_raw_data = page.evaluate('''
+                    ([elements, maxPosts]) => {
+                        return elements.slice(0, maxPosts).map(post => {
+                            const linkEl = post.querySelector('a.app-aware-link');
+                            return {
+                                innerText: post.innerText || "",
+                                href: linkEl ? linkEl.href : ""
+                            };
+                        });
+                    }
+                ''', [post_elements, max_posts])
 
-                    text_start_idx = 2
-                    for i, line in enumerate(lines[:5]):
-                        if '•' in line and ('h' in line or 'm' in line or 'd' in line):
-                            text_start_idx = i + 1
-                            break
+                for idx, post_data in enumerate(posts_raw_data):
+                    try:
+                        raw_text = post_data.get('innerText', '')
+                        if not raw_text.strip():
+                            continue
 
-                    post_content = "\n".join(lines[text_start_idx:])
-                    post_content = post_content.replace("Like\nComment\nRepost\nSend", "")
+                        lines = [line.strip() for line in raw_text.split('\n') if line.strip()]
+                        if lines and lines[0] == "Feed post":
+                            lines = lines[1:]
+                        if len(lines) < 3:
+                            continue
 
-                    has_link = "http" in post_content or "www." in post_content
-                    
-                    profile_link = post.query_selector("a.app-aware-link")
-                    profile_url = profile_link.get_attribute("href") if profile_link else ""
-                    if profile_url and "?" in profile_url:
-                        profile_url = profile_url.split("?")[0] # Clean tracking params
+                        name = lines[0].split('•')[0].strip()
+                        company_or_headline = lines[1]
 
-                    posts_data.append({
-                        "text": post_content,
-                        "name": name,
-                        "company": company_or_headline,
-                        "has_link": has_link,
-                        "link": post_content,
-                        "profile_url": profile_url,
-                    })
-                except Exception as e:
-                    print(f"Error parsing a post: {e}")
+                        text_start_idx = 2
+                        for i, line in enumerate(lines[:5]):
+                            if '•' in line and ('h' in line or 'm' in line or 'd' in line):
+                                text_start_idx = i + 1
+                                break
+
+                        post_content = "\n".join(lines[text_start_idx:])
+                        post_content = post_content.replace("Like\nComment\nRepost\nSend", "")
+
+                        has_link = "http" in post_content or "www." in post_content
+
+                        profile_url = post_data.get('href', '')
+                        if profile_url and "?" in profile_url:
+                            profile_url = profile_url.split("?")[0] # Clean tracking params
+
+                        posts_data.append({
+                            "text": post_content,
+                            "name": name,
+                            "company": company_or_headline,
+                            "has_link": has_link,
+                            "link": post_content,
+                            "profile_url": profile_url,
+                        })
+                    except Exception as e:
+                        print(f"Error parsing a post in batched loop: {e}")
+
+            except Exception as e:
+                print(f"Error executing batch evaluate: {e}")
 
 
     except Exception as e:
