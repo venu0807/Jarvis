@@ -102,6 +102,9 @@ async def solve_with_dom_async(page, instruction: str):
     action_data = _parse_response(content)
     action = action_data.get('action')
     
+    await _execute_action_async(page, action_data, action)
+
+async def _execute_action_async(page, action_data, action):
     if action == 'click':
         target = action_data['target_text']
         print(f"  -> DOM System clicking: '{target}'")
@@ -150,6 +153,9 @@ def solve_with_dom_sync(page, instruction: str):
     action_data = _parse_response(content)
     action = action_data.get('action')
     
+    _execute_action_sync(page, action_data, action)
+
+def _execute_action_sync(page, action_data, action):
     if action == 'click':
         target = action_data['target_text']
         print(f"  -> DOM System clicking: '{target}'")
@@ -171,3 +177,5 @@ def solve_with_dom_sync(page, instruction: str):
         
     elif action == 'skip':
         print("  -> DOM System skipped action.")
+    else:
+        print(f"  -> Unknown action: {action_data}")
