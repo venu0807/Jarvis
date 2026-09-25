@@ -419,6 +419,125 @@ def _call_cloud(prompt: str, model: str) -> tuple[str, float]:
     return _call_ollama(prompt, model, POLICY["ollama_url"])
 
 
+def _determine_routing(
+    finding: PIIFinding,
+    policy: dict,
+    decision_log: dict,
+    mode: str,
+    force: str,
+    pii_acknowledged: bool,
+    on_pii_refused: Optional[Callable[[PIIFinding], None]],
+) -> tuple[str, str, bool]:
+    """Determines provider, model, and redaction status based on rules."""
+    provider = None
+    model = None
+    redacted = False
+
+    if force == "local":
+        provider = "local"
+        model = policy["default_local_model"]
+    elif force == "cloud":
+        provider = "cloud"
+        model = policy["default_cloud_model"]
+    elif mode == "run":
+        provider = "local"
+        model = policy["default_local_model"]
+        if finding.has_structured_pii and not pii_acknowledged:
+            decision_log["note"] = "run mode + structured PII + not acknowledged -> forced local"
+    elif mode == "build":
+        if finding.has_structured_pii:
+            # Build claimed "no PII", but PII was found. Refuse cloud.
+            if on_pii_refused:
+                on_pii_refused(finding)
+            provider = "local"
+            model = policy["default_local_model"]
+            redacted = True
+            decision_log["note"] = (
+                "build mode but PII detected -> redacted+local "
+                "(speaker must have lied about build cleanliness)"
+            )
+        else:
+            # Check env override — /public or JARVIS_ALLOW_CLOUD=1
+            env_allow = os.environ.get("JARVIS_ALLOW_CLOUD", "").strip() == "1"
+            if not env_allow or not policy.get("default_cloud_model"):
+                # Default: build without env-allow = still local, defense in depth
+                provider = "local"
+                model = policy["default_local_model"]
+                decision_log["note"] = (
+                    "build mode but JARVIS_ALLOW_CLOUD not set, "
+                    "defaulting to local"
+                )
+            else:
+                # Check deny-list
+                cm = policy.get("default_cloud_model", "")
+                if any(d.lower() in cm.lower() for d in policy.get("denied_cloud_models", [])):
+                    provider = "local"
+                    model = policy["default_local_model"]
+                    decision_log["note"] = (
+                        f"cloud model {cm} on denied-list, routed local"
+                    )
+                else:
+                    provider = "cloud"
+                    model = policy["default_cloud_model"]
+    else:  # hybrid
+        if finding.has_pii:
+            # PII found → local
+            if not pii_acknowledged:
+                # Redact defensively even on local — defense in depth
+                redacted = True
+            provider = "local"
+            model = policy["default_local_model"]
+        else:
+            provider = "cloud"
+            model = policy["default_cloud_model"]
+
+    return provider, model, redacted
+
+
+def _execute_llm_call(
+    text_to_send: str,
+    provider: str,
+    model: str,
+    policy: dict,
+    timeout_s: Optional[int],
+    task_label: str,
+    finding: PIIFinding,
+    redacted: bool,
+) -> LLMResult:
+    """Executes the LLM call and handles specific errors."""
+    if provider == "local":
+        try:
+            text, latency = _call_ollama(text_to_send, model, policy["ollama_url"], timeout_s=timeout_s)
+        except ReadTimeoutError as te:
+            _audit({
+                "task": task_label,
+                "event": "ollama_timeout",
+                "model": model,
+                "prompt_len": te.prompt_len,
+                "timeout_s": te.timeout_s,
+                "latency_s": float(te.timeout_s),
+            })
+            return LLMResult(
+                text="",
+                model=model,
+                provider="local",
+                redacted=redacted,
+                finding=finding,
+                latency_s=float(te.timeout_s),
+            )
+    else:
+        text, latency = _call_cloud(text_to_send, model)
+
+    return LLMResult(
+        text=text,
+        model=model,
+        provider=provider,
+        redacted=redacted,
+        finding=finding,
+        latency_s=latency,
+    )
+
+
 def call_llm(
     prompt: str,
     *,
@@ -467,109 +586,24 @@ def call_llm(
     }
 
     # Rule engine — apply in order
-    provider = None
-    model = None
-    redacted = False
-
-    if force == "local":
-        provider = "local"
-        model = policy["default_local_model"]
-    elif force == "cloud":
-        provider = "cloud"
-        model = policy["default_cloud_model"]
-    elif mode == "run":
-        provider = "local"
-        model = policy["default_local_model"]
-        if finding.has_structured_pii and not pii_acknowledged:
-            decision_log["note"] = "run mode + structured PII + not acknowledged -> forced local"
-    elif mode == "build":
-        if finding.has_structured_pii:
-            # Build claimed "no PII", but PII was found. Refuse cloud.
-            if on_pii_refused:
-                on_pii_refused(finding)
-            prompt_safe = redact_for_cloud(prompt, finding)
-            provider = "local"
-            model = policy["default_local_model"]
-            redacted = True
-            decision_log["note"] = (
-                "build mode but PII detected -> redacted+local "
-                "(speaker must have lied about build cleanliness)"
-            )
-        else:
-            # Check env override — /public or JARVIS_ALLOW_CLOUD=1
-            env_allow = os.environ.get("JARVIS_ALLOW_CLOUD", "").strip() == "1"
-            if not env_allow or not policy.get("default_cloud_model"):
-                # Default: build without env-allow = still local, defense in depth
-                provider = "local"
-                model = policy["default_local_model"]
-                decision_log["note"] = (
-                    "build mode but JARVIS_ALLOW_CLOUD not set, "
-                    "defaulting to local"
-                )
-            else:
-                # Check deny-list
-                cm = policy.get("default_cloud_model", "")
-                if any(d.lower() in cm.lower() for d in policy.get("denied_cloud_models", [])):
-                    provider = "local"
-                    model = policy["default_local_model"]
-                    decision_log["note"] = (
-                        f"cloud model {cm} on denied-list, routed local"
-                    )
-                else:
-                    provider = "cloud"
-                    model = policy["default_cloud_model"]
-    else:  # hybrid
-        if finding.has_pii:
-            # PII found → local
-            prompt_safe = prompt
-            if not pii_acknowledged:
-                # Redact defensively even on local — defense in depth
-                prompt_safe = redact_for_cloud(prompt, finding)
-                redacted = True
-            provider = "local"
-            model = policy["default_local_model"]
-        else:
-            provider = "cloud"
-            model = policy["default_cloud_model"]
+    provider, model, redacted = _determine_routing(
+        finding, policy, decision_log, mode, force, pii_acknowledged, on_pii_refused
+    )
 
     decision_log["chosen"] = f"{provider}:{model}"
     _audit(decision_log)
 
     # Execute
     text_to_send = redact_for_cloud(prompt, finding) if redacted else prompt
-    if provider == "local":
-        try:
-            text, latency = _call_ollama(text_to_send, model, policy["ollama_url"], timeout_s=timeout_s)
-        except ReadTimeoutError as te:
-            # Audit the timeout — this is signal for future tuning. Caller
-            # still sees an empty-text LLMResult back, not an exception, so
-            # existing automations don't need error-handling rewrites.
-            _audit({
-                "task": task_label,
-                "event": "ollama_timeout",
-                "model": model,
-                "prompt_len": te.prompt_len,
-                "timeout_s": te.timeout_s,
-                "latency_s": float(te.timeout_s),
-            })
-            return LLMResult(
-                text="",
-                model=model,
-                provider="local",
-                redacted=redacted,
-                finding=finding,
-                latency_s=float(te.timeout_s),
-            )
-    else:
-        text, latency = _call_cloud(text_to_send, model)
-
-    return LLMResult(
-        text=text,
-        model=model,
-        provider=provider,
-        redacted=redacted,
-        finding=finding,
-        latency_s=latency,
+    return _execute_llm_call(
+        text_to_send,
+        provider,
+        model,
+        policy,
+        timeout_s,
+        task_label,
+        finding,
+        redacted,
     )
 
 
