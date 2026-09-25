@@ -66,9 +66,7 @@ def check_native_processes():
     except Exception as e:
         return [f"Error checking processes: {str(e)}"]
 
-def main():
-    results = {}
-    
+def check_core_databases(results):
     # Check PostgreSQL (native)
     pg_host = "localhost"
     pg_port = 5432
@@ -77,12 +75,14 @@ def main():
     pg_pass = "jarvis"  # default from docker-compose
     pg_ok, pg_msg = check_postgres(pg_host, pg_port, pg_db, pg_user, pg_pass)
     results["postgresql"] = {"status": "OK" if pg_ok else "FAIL", "message": pg_msg}
-    
+
+def check_ollama_service(results):
     # Check Ollama (native)
     ollama_port = 11434
     ollama_ok = check_port("localhost", ollama_port)
     results["ollama"] = {"status": "OK" if ollama_ok else "FAIL", "message": f"Port {ollama_port} {'open' if ollama_ok else 'closed'}"}
-    
+
+def check_docker_services(results):
     # Define services from docker-compose
     services = [
         ("job-automation", 8001, "http://localhost:8001/healthz"),
@@ -110,7 +110,8 @@ def main():
             "http_check": http_msg if health_endpoint else "N/A",
             "message": f"Port {port}: {'open' if port_ok else 'closed'}, {http_msg}"
         }
-    
+
+def check_system_environment(results):
     # Check Docker containers
     containers = check_docker_containers()
     results["docker_containers"] = {
@@ -124,12 +125,15 @@ def main():
         "status": "INFO",
         "data": processes[:10]  # Limit output
     }
-    
+
+def evaluate_overall_status(results):
     # Overall status
     critical_services = ["postgresql", "ollama", "job-automation", "pinterest", "model-router"]
     overall_ok = all(results.get(s, {}).get("status") == "OK" for s in critical_services if s in results)
     results["overall"] = {"status": "OK" if overall_ok else "FAIL", "message": "All critical services healthy" if overall_ok else "Some critical services unhealthy"}
-    
+    return overall_ok
+
+def print_health_report(results):
     # Print report
     print("=== JARVIS SYSTEM HEALTH CHECK ===")
     for key, val in results.items():
@@ -152,8 +156,15 @@ def main():
             print(f"  {val}")
     
     print(f"\nOVERALL: {results['overall']['status']} - {results['overall']['message']}")
-    
-    # Return exit code
+
+def main():
+    results = {}
+    check_core_databases(results)
+    check_ollama_service(results)
+    check_docker_services(results)
+    check_system_environment(results)
+    overall_ok = evaluate_overall_status(results)
+    print_health_report(results)
     sys.exit(0 if overall_ok else 1)
 
 if __name__ == "__main__":
