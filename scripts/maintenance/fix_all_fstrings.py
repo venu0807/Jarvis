@@ -1,13 +1,13 @@
 import re
 
-with open('/home/venu/Proposals/Jarvis/automations/alert_triggers.py', 'r') as f:
+with open('automations/alert_triggers.py', 'r') as f:
     content = f.read()
 
-# Fix all broken f-string concatenations
+# Update all broken f-string concatenations
 # Pattern: message=f"..." followed by multiple f"..." lines ending with a comma
 # We need to wrap them in parentheses and use {NL} for newlines
 
-# Fix 1: scheduler_missing block
+# Update 1: scheduler_missing block
 old1 = '''message=f"JARVIS scheduler log file not found: {SCHEDULER_LOG}\n\n"
                             f"This suggests the cron scheduler may not be running.\n"
                             f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
@@ -30,7 +30,7 @@ new1 = '''message=(
 
 content = content.replace(old1, new1)
 
-# Fix 2: scheduler_stale block
+# Update 2: scheduler_stale block
 old2 = '''message=f"JARVIS scheduler log has not been updated in >30 minutes.\n\n"
                                 f"Last activity: {mtime.strftime('%Y-%m-%d %H:%M:%S')}\n"
                                 f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
@@ -59,7 +59,7 @@ new2 = '''message=(
 
 content = content.replace(old2, new2)
 
-# Fix 3: disk_space block
+# Update 3: disk_space block
 old3 = '''message=(
                         f"Disk usage is critical: {percent_used:.1f}% used{NL}{NL}"
                         f"Total: {disk.total // (1024**3)} GB{NL}"
@@ -105,7 +105,7 @@ new3 = '''message=(
 
 content = content.replace(old3_broken, new3)
 
-# Fix 4: ollama_unavailable block (status code version)
+# Update 4: ollama_unavailable block (status code version)
 old4 = '''message=(
                         "Ollama API is not responding correctly.{NL}{NL}"
                         f"Status code: {response.status_code}{NL}"
@@ -143,7 +143,7 @@ old4_broken = '''message=f"Ollama API is not responding correctly.\n\n"
 
 content = content.replace(old4_broken, old4)
 
-# Fix 5: ollama_unavailable block (exception version)
+# Update 5: ollama_unavailable block (exception version)
 old5_broken = '''message=f"Cannot connect to Ollama API.\n\n"
                     f"Error: {str(e)}\n"
                     f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
@@ -170,7 +170,7 @@ new5 = '''message=(
 
 content = content.replace(old5_broken, new5)
 
-# Fix 6: portal_sessions_old block
+# Update 6: portal_sessions_old block
 old6_broken = '''message=(
                     "Some portal session files are older than 7 days.{NL}{NL}"
                     "Old sessions found:{NL}" + "\n".join(f"  - {s}" for s in old_sessions[:5]) +
@@ -202,7 +202,7 @@ old6_broken2 = '''message=(
 
 content = content.replace(old6_broken2, old6_broken)
 
-with open('/home/venu/Proposals/Jarvis/automations/alert_triggers.py', 'w') as f:
+with open('automations/alert_triggers.py', 'w') as f:
     f.write(content)
 
 print('Fixed all broken f-string blocks')
