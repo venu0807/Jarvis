@@ -33,7 +33,6 @@ except Exception as e:
 # 3. Check AI Commander (Ollama Policy)
 try:
     import urllib.request
-    import json
     req = urllib.request.Request('http://localhost:11434/api/tags')
     with urllib.request.urlopen(req, timeout=2) as response:
         print('✅ [3/5] AI Commander (OpenClaw/Ollama): ONLINE')
