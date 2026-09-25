@@ -167,50 +167,15 @@ class AlertManager:
                 break  # Older alerts don't matter
         return False
 
-    def send_alert(self, title: str, message: str, severity: str = "info",
-                   alert_key: str = None, channels: List[str] = None) -> bool:
-        """
-        Send alert via configured channels
-
-        Args:
-            title: Alert title
-            message: Alert message body
-            severity: info, warning, critical
-            alert_key: Unique key for deduplication (optional)
-            channels: List of channel names to use (None = all enabled)
-        """
-        # Rate limiting
-        if self._is_rate_limited():
-            logger.error("Alert suppressed due to rate limiting")
-            return False
-
-        # Deduplication
-        if alert_key:
-            if self._is_duplicate(alert_key):
-                logger.debug(f"Alert suppressed as duplicate: {alert_key}")
-                return False
-
-        # Determine channels to use
+    def _get_active_channels(self, channels: List[str] = None) -> List[str]:
+        """Determine which channels are active and enabled"""
         if channels is None:
-            channels = [name for name, config in self.config["channels"].items()
-                       if config.get("enabled", False)]
-        else:
-            channels = [c for c in channels if self.config["channels"].get(c, {}).get("enabled", False)]
+            return [name for name, config in self.config["channels"].items()
+                   if config.get("enabled", False)]
+        return [c for c in channels if self.config["channels"].get(c, {}).get("enabled", False)]
 
-        if not channels:
-            logger.warning("No enabled channels for alert")
-            return False
-
-        # Prepare alert record
-        alert_record = {
-            "timestamp": datetime.now().isoformat(),
-            "title": title,
-            "message": message,
-            "severity": severity,
-            "key": alert_key or hashlib.md5(f"{title}{message}".encode()).hexdigest()[:8]
-        }
-
-        # Send via each channel
+    def _dispatch_alert(self, channels: List[str], title: str, message: str, severity: str) -> bool:
+        """Dispatch alert to all specified channels"""
         success = False
         for channel in channels:
             try:
@@ -225,15 +190,51 @@ class AlertManager:
                         success = True
             except Exception as e:
                 logger.error(f"Failed to send alert via {channel}: {e}")
+        return success
+
+    def send_alert(self, title: str, message: str, severity: str = "info",
+                   alert_key: str = None, channels: List[str] = None) -> bool:
+        """
+        Send alert via configured channels
+
+        Args:
+            title: Alert title
+            message: Alert message body
+            severity: info, warning, critical
+            alert_key: Unique key for deduplication (optional)
+            channels: List of channel names to use (None = all enabled)
+        """
+        if self._is_rate_limited():
+            logger.error("Alert suppressed due to rate limiting")
+            return False
+
+        if alert_key and self._is_duplicate(alert_key):
+            logger.debug(f"Alert suppressed as duplicate: {alert_key}")
+            return False
+
+        active_channels = self._get_active_channels(channels)
+        if not active_channels:
+            logger.warning("No enabled channels for alert")
+            return False
+
+        alert_record = {
+            "timestamp": datetime.now().isoformat(),
+            "title": title,
+            "message": message,
+            "severity": severity,
+            "key": alert_key or hashlib.md5(f"{title}{message}".encode()).hexdigest()[:8]
+        }
+
+        success = self._dispatch_alert(active_channels, title, message, severity)
 
         if success:
             self.alert_history.append(alert_record)
             self._save_history()
             logger.info(f"Alert sent: {title}")
             return True
-        else:
-            logger.error("Failed to send alert via any channel")
-            return False
+
+        logger.error("Failed to send alert via any channel")
+        return False
 
     def _send_email(self, title: str, message: str, severity: str) -> bool:
         """Send alert via email"""
