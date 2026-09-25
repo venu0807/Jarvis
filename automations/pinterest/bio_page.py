@@ -299,9 +299,10 @@ def generate_bio_page(
         ].copy()
 
         products = []
+        amazon_tag_match = "tag=" + os.getenv("AMAZON_AFFILIATE_TAG", "venue")
         for _, row in pending.iterrows():
             link = str(row.get("Affiliate Link", "")).strip()
-            if not link or "tag=" + os.getenv("AMAZON_AFFILIATE_TAG", "venue") not in link:
+            if not link or amazon_tag_match not in link:
                 # include if tag matches anyway
                 if "tag=" not in link:
                     continue
