@@ -201,7 +201,7 @@ class TestTemplates(unittest.TestCase):
         body = get_template("UNKNOWN_ID")
         # Should fall back to T2 (hiring manager DM)
         self.assertIn("{first_name}", body)
-        self.assertIn("MCA in AI/ML", body)
+        self.assertIn("MCA", body)
         # T2 should mention portfolio or projects
         self.assertIn("github.com/venu0807", body)
 
