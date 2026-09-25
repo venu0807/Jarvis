@@ -1,3 +1,4 @@
+import os
 import smtplib
 from email.mime.text import MIMEText
 
@@ -5,7 +6,7 @@ def send_email(subject, body):
     # Email configuration
     sender_email = "your_email@example.com"
     receiver_email = "user_email@example.com"
-    password = "your_password"  # Replace with your actual email password
+    password = os.environ.get("EMAIL_PASSWORD", "")
 
     # Create the message
     message = MIMEText(body)
