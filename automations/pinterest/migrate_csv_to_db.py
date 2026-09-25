@@ -46,7 +46,7 @@ def migrate():
         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         
-        count = 0
+        rows_to_insert = []
         for row in reader:
             if not row or not any(row):
                 continue
@@ -55,8 +55,11 @@ def migrate():
             row = row + [''] * (13 - len(row))
             row = row[:13]
             
-            cur.execute(insert_query, row)
-            count += 1
+            rows_to_insert.append(row)
+
+        if rows_to_insert:
+            cur.executemany(insert_query, rows_to_insert)
+        count = len(rows_to_insert)
             
     conn.commit()
     cur.close()
