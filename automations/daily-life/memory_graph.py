@@ -33,6 +33,7 @@ def update_memory_graph():
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
+        from psycopg2.extras import execute_values
         
         # 1. Fetch recent events that haven't been vectorized yet
         # For simplicity in this implementation, we just fetch the last 10 events
@@ -46,6 +47,7 @@ def update_memory_graph():
         print(f"  📥 Found {len(recent_events)} recent events. Generating embeddings...")
         
         memorized_count = 0
+        records_to_insert = []
         for event_id, event_type, payload, created_at in recent_events:
             # Check if we already memorized this event (using a simple metadata check)
             # Wait, earlier I recreated the table without the metadata column to make it simpler, but let's check if it has metadata.
@@ -73,12 +75,16 @@ def update_memory_graph():
             r = requests.post("http://localhost:11434/api/embeddings", json={"model": "nomic-embed-text:latest", "prompt": memory_text})
             embedding = r.json()["embedding"]
             
-            # 4. Insert into pgvector
-            cur.execute(
-                "INSERT INTO memory_embeddings (content, embedding, event_id) VALUES (%s, %s, %s)",
-                (memory_text, embedding, event_id)
+            # 4. We will batch insert later, so we just add to our list
+            records_to_insert.append((memory_text, embedding, event_id))
+
+        if records_to_insert:
+            execute_values(
+                cur,
+                "INSERT INTO memory_embeddings (content, embedding, event_id) VALUES %s",
+                records_to_insert
             )
-            memorized_count += 1
+            memorized_count = len(records_to_insert)
             
         conn.commit()
         cur.close()
