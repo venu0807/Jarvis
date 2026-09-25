@@ -75,15 +75,33 @@ def save_jobs_to_db(results: list[ApplicationResult]):
     init_db()
     now = datetime.datetime.now().isoformat()
     
-    with sqlite3.connect(DB_PATH) as conn:
-        for r in results:
-            job = r.job
-            job_id = job.get("id", "")
-            if not job_id:
-                continue
-                
+    job_params = []
+    seen_params = []
+
+    for r in results:
+        job = r.job
+        job_id = job.get("id", "")
+        if not job_id:
+            continue
+
+        job_params.append((
+            job_id,
+            job.get("title", ""),
+            job.get("company", ""),
+            job.get("location", ""),
+            job.get("portal", ""),
+            job.get("url", ""),
+            job.get("description", ""),
+            r.status,
+            getattr(r, "skip_reason", None) or getattr(r, "reason", None) or "",
+            now
+        ))
+        seen_params.append((job_id, now))
+
+    if job_params:
+        with sqlite3.connect(DB_PATH) as conn:
             try:
-                conn.execute("""
+                conn.executemany("""
                     INSERT INTO jobs (id, title, company, location, portal, url, description, status, skip_reason, timestamp)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET 
@@ -91,23 +109,27 @@ def save_jobs_to_db(results: list[ApplicationResult]):
                         skip_reason=COALESCE(excluded.skip_reason, jobs.skip_reason),
                         timestamp=excluded.timestamp,
                         description=CASE WHEN excluded.description != '' THEN excluded.description ELSE jobs.description END
-                """, (
-                    job_id,
-                    job.get("title", ""),
-                    job.get("company", ""),
-                    job.get("location", ""),
-                    job.get("portal", ""),
-                    job.get("url", ""),
-                    job.get("description", ""),
-                    r.status,
-                    getattr(r, "skip_reason", None) or getattr(r, "reason", None) or "",
-                    now
-                ))
+                """, job_params)
+
                 # Also mark seen
-                conn.execute("INSERT OR IGNORE INTO seen_jobs (id, first_seen) VALUES (?, ?)", (job_id, now))
+                conn.executemany("INSERT OR IGNORE INTO seen_jobs (id, first_seen) VALUES (?, ?)", seen_params)
             except Exception as e:
-                print(f"⚠️ Could not insert job {job_id} into DB: {e}")
-        conn.commit()
+                print(f"⚠️ Bulk insert failed, falling back to individual inserts: {e}")
+                for jp, sp in zip(job_params, seen_params):
+                    try:
+                        conn.execute("""
+                            INSERT INTO jobs (id, title, company, location, portal, url, description, status, skip_reason, timestamp)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(id) DO UPDATE SET
+                                status=excluded.status,
+                                skip_reason=COALESCE(excluded.skip_reason, jobs.skip_reason),
+                                timestamp=excluded.timestamp,
+                                description=CASE WHEN excluded.description != '' THEN excluded.description ELSE jobs.description END
+                        """, jp)
+                        conn.execute("INSERT OR IGNORE INTO seen_jobs (id, first_seen) VALUES (?, ?)", sp)
+                    except Exception as inner_e:
+                        print(f"⚠️ Could not insert job {jp[0]} into DB: {inner_e}")
+            conn.commit()
 
     applied_results = [r for r in results if r.status == "applied"]
     if applied_results and os.getenv("PG_PASSWORD"):
