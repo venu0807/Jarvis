@@ -184,12 +184,20 @@ class TestSentTracker(unittest.TestCase):
 class TestTemplates(unittest.TestCase):
 
     def test_list_templates(self):
-        from templates import list_templates
+        from templates import list_templates, TEMPLATES
         templates = list_templates()
+        self.assertIsInstance(templates, list)
+        self.assertEqual(set(templates), set(TEMPLATES.keys()))
+        self.assertEqual(len(templates), len(TEMPLATES))
         self.assertEqual(set(templates), {"T1", "T2", "T3", "T4", "T5"})
 
     def test_get_template(self):
-        from templates import get_template
+        from templates import get_template, TEMPLATES
+        # Verify valid IDs return correct template
+        for template_id, template_content in TEMPLATES.items():
+            self.assertEqual(get_template(template_id), template_content)
+
+        # Specific token checks as previously done
         for tid in ["T1", "T2", "T3", "T4", "T5"]:
             body = get_template(tid)
             self.assertIn("{first_name}", body)
@@ -197,13 +205,18 @@ class TestTemplates(unittest.TestCase):
             self.assertIn("{company}", body)
 
     def test_default_template(self):
-        from templates import get_template
+        from templates import get_template, T2_HIRING_MANAGER_DM
         body = get_template("UNKNOWN_ID")
         # Should fall back to T2 (hiring manager DM)
+        self.assertEqual(body, T2_HIRING_MANAGER_DM)
         self.assertIn("{first_name}", body)
-        self.assertIn("MCA in AI/ML", body)
+        self.assertIn("MCA graduate specializing in Software Engineering and AI/ML", body)
         # T2 should mention portfolio or projects
         self.assertIn("github.com/venu0807", body)
+
+        # Check other invalid inputs
+        self.assertEqual(get_template(""), T2_HIRING_MANAGER_DM)
+        self.assertEqual(get_template("T6"), T2_HIRING_MANAGER_DM)
 
 
 if __name__ == "__main__":
