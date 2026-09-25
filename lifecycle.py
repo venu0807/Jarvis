@@ -134,6 +134,31 @@ def _next_stage(current: Stage) -> Optional[Stage]:
         return None
 
 
+def _check_dry_to_live_gate(data: dict, dry_history_required: int) -> Optional[str]:
+    """Validate promotion from DRY to LIVE stage."""
+    history = data.get("dry_runs", {}).get("history", [])
+    passed = [h for h in history if h.get("outcome") == "PASS"]
+
+    if len(passed) < dry_history_required:
+        return f"need {dry_history_required} dry PASS, have {len(passed)}"
+
+    recent = history[-dry_history_required:]
+    if any(h.get("leak_warnings") for h in recent):
+        return "last 3 dry runs had leak warnings"
+
+    if recent:
+        last_ts = recent[-1].get("ran_at")
+        if last_ts:
+            try:
+                last_dt = datetime.fromisoformat(last_ts.replace("Z", "+00:00"))
+                age_h = (datetime.now(timezone.utc) - last_dt).total_seconds() / 3600
+                if age_h > 24:
+                    return f"last dry run is {age_h:.1f}h old (>24h stale)"
+            except Exception:
+                pass
+    return None
+
+
 def promote(name: str, target: Stage, *, dry_history_required: int = 3) -> PromotionResult:
     """Promote name to target stage. Enforces chain + critical dry->live gate.
 
@@ -186,35 +211,9 @@ def promote(name: str, target: Stage, *, dry_history_required: int = 3) -> Promo
 
     # Critical gate: dry -> live needs 3 dry PASS + 0 leak warnings + <24h
     if current == Stage.DRY and target == Stage.LIVE:
-        history = data.get("dry_runs", {}).get("history", [])
-        passed = [h for h in history if h.get("outcome") == "PASS"]
-
-        if len(passed) < dry_history_required:
-            return PromotionResult(
-                False,
-                f"need {dry_history_required} dry PASS, have {len(passed)}"
-            )
-
-        recent = history[-dry_history_required:]
-        if any(h.get("leak_warnings") for h in recent):
-            return PromotionResult(
-                False,
-                "last 3 dry runs had leak warnings"
-            )
-
-        if recent:
-            last_ts = recent[-1].get("ran_at")
-            if last_ts:
-                try:
-                    last_dt = datetime.fromisoformat(last_ts.replace("Z", "+00:00"))
-                    age_h = (datetime.now(timezone.utc) - last_dt).total_seconds() / 3600
-                    if age_h > 24:
-                        return PromotionResult(
-                            False,
-                            f"last dry run is {age_h:.1f}h old (>24h stale)"
-                        )
-                except Exception:
-                    pass
+        error_msg = _check_dry_to_live_gate(data, dry_history_required)
+        if error_msg:
+            return PromotionResult(False, error_msg)
 
     data["stage"] = target.value
     data["updated"] = _now()
