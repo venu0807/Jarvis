@@ -9,7 +9,6 @@ Responsibilities:
 - Manages PostgreSQL startup and schema initialization.
 """
 
-import os
 import sys
 import time
 import datetime
