@@ -6,6 +6,7 @@ Run: python quick_setup.py
 import os
 import subprocess
 import sys
+import shlex
 from pathlib import Path
 
 BASE = Path(__file__).parent
@@ -15,7 +16,9 @@ def step(num, title, command=None):
     print(f"  Step {num}: {title}")
     print(f"{'='*60}")
     if command:
-        result = subprocess.run(command, shell=True, cwd=BASE)
+        if isinstance(command, str):
+            command = shlex.split(command)
+        result = subprocess.run(command, shell=False, cwd=BASE)
         if result.returncode != 0:
             print(f"  ⚠️  Step {num} had issues. Check above.")
 
