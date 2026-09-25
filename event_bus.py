@@ -2,7 +2,7 @@ import json
 import os
 import psycopg2
 import logging
-from typing import Callable, Any, Dict
+from typing import Any, Dict
 
 logger = logging.getLogger("event_bus")
 
