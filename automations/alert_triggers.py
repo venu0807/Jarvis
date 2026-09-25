@@ -156,49 +156,59 @@ def check_postgres_connection():
     return False
 
 
+def _handle_scheduler_missing():
+    if should_alert("scheduler_missing"):
+        send_warning(
+            title="⚠️ Scheduler Log Missing",
+            message=(
+                f"JARVIS scheduler log file not found: {SCHEDULER_LOG}{NL}{NL}"
+                "This suggests the cron scheduler may not be running.{NL}"
+                f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{NL}{NL}"
+                "Immediate actions:{NL}"
+                "1. Check cron service: systemctl --user status cron{NL}"
+                "2. Check crontab: crontab -l{NL}"
+                f"3. Restart scheduler: {JARVIS_HOME}/jarvis_scheduler.sh &{NL}"
+                "4. Verify it's running: ps aux | grep jarvis_scheduler"
+            ),
+            alert_key="scheduler_missing"
+        )
+        return True
+    return False
+
+
+def _handle_scheduler_stale(mtime):
+    if should_alert("scheduler_stale"):
+        send_critical(
+            title="🚨 Scheduler Appears Dead",
+            message=(
+                "JARVIS scheduler log has not been updated in >30 minutes.{NL}{NL}"
+                f"Last activity: {mtime.strftime('%Y-%m-%d %H:%M:%S')}{NL}"
+                f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{NL}"
+                f"Log file: {SCHEDULER_LOG}{NL}{NL}"
+                "This indicates the cron scheduler may have stopped.{NL}{NL}"
+                "Immediate actions:{NL}"
+                "1. Check scheduler process: ps aux | grep jarvis_scheduler{NL}"
+                "2. Check cron logs: journalctl --user -u cron{NL}"
+                f"3. Restart scheduler: nohup {JARVIS_HOME}/jarvis_scheduler.sh &{NL}"
+                "4. Verify crontab is installed: crontab -l{NL}"
+                "5. Check for errors in scheduler script"
+            ),
+            alert_key="scheduler_stale"
+        )
+        return True
+    return False
+
+
 def check_scheduler_health():
     """Alert if cron scheduler appears dead (>30 min no activity)"""
     try:
         if not SCHEDULER_LOG.exists():
-            if should_alert("scheduler_missing"):
-                send_warning(
-                    title="⚠️ Scheduler Log Missing",
-                    message=(
-                        f"JARVIS scheduler log file not found: {SCHEDULER_LOG}{NL}{NL}"
-                        "This suggests the cron scheduler may not be running.{NL}"
-                        f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{NL}{NL}"
-                        "Immediate actions:{NL}"
-                        "1. Check cron service: systemctl --user status cron{NL}"
-                        "2. Check crontab: crontab -l{NL}"
-                        f"3. Restart scheduler: {JARVIS_HOME}/jarvis_scheduler.sh &{NL}"
-                        "4. Verify it's running: ps aux | grep jarvis_scheduler"
-                    ),
-                    alert_key="scheduler_missing"
-                )
-                return True
+            return _handle_scheduler_missing()
         else:
             # Check last modification time
             mtime = datetime.fromtimestamp(SCHEDULER_LOG.stat().st_mtime)
             if datetime.now() - mtime > timedelta(minutes=30):
-                if should_alert("scheduler_stale"):
-                    send_critical(
-                        title="🚨 Scheduler Appears Dead",
-                        message=(
-                            "JARVIS scheduler log has not been updated in >30 minutes.{NL}{NL}"
-                            f"Last activity: {mtime.strftime('%Y-%m-%d %H:%M:%S')}{NL}"
-                            f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{NL}"
-                            f"Log file: {SCHEDULER_LOG}{NL}{NL}"
-                            "This indicates the cron scheduler may have stopped.{NL}{NL}"
-                            "Immediate actions:{NL}"
-                            "1. Check scheduler process: ps aux | grep jarvis_scheduler{NL}"
-                            "2. Check cron logs: journalctl --user -u cron{NL}"
-                            f"3. Restart scheduler: nohup {JARVIS_HOME}/jarvis_scheduler.sh &{NL}"
-                            "4. Verify crontab is installed: crontab -l{NL}"
-                            "5. Check for errors in scheduler script"
-                        ),
-                        alert_key="scheduler_stale"
-                    )
-                    return True
+                return _handle_scheduler_stale(mtime)
             else:
                 # Clear alert if it was previously firing
                 if "scheduler_stale" in last_alerts:
