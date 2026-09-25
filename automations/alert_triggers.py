@@ -245,6 +245,58 @@ def check_disk_space():
     return False
 
 
+def _send_ollama_bad_status_alert(response):
+    """Helper to send alert when Ollama returns a non-200 status code"""
+    if should_alert("ollama_unavailable"):
+        send_warning(
+            title="⚠️ Ollama Unavailable",
+            message=(
+                "Ollama API is not responding correctly.{NL}{NL}"
+                f"Status code: {response.status_code}{NL}"
+                f"Response: {response.text[:200] if response.text else 'No response'}{NL}"
+                f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{NL}{NL}"
+                "Impact:{NL}"
+                "- AI job classification will fail{NL}"
+                "- Cover letter generation disabled{NL}"
+                "- Resume tailoring unavailable{NL}"
+                "- Interview preparation affected{NL}{NL}"
+                "Immediate actions:{NL}"
+                "1. Check Ollama service: systemctl --user status ollama{NL}"
+                "2. Restart Ollama: systemctl --user restart ollama{NL}"
+                "3. Verify it's running: curl http://localhost:11434/api/tags{NL}"
+                "4. Check logs: journalctl --user -u ollama{NL}"
+                "5. Pull a model to test: ollama pull llama3.2"
+            ),
+            alert_key="ollama_unavailable"
+        )
+        return True
+    return False
+
+
+def _send_ollama_connection_error_alert(error_msg: str):
+    """Helper to send alert when Ollama connection fails completely"""
+    if should_alert("ollama_unavailable"):
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        send_warning(
+            title="⚠️ Ollama Unavailable",
+            message=(
+                "Cannot connect to Ollama API.{NL}{NL}"
+                f"Error: {error_msg}{NL}"
+                f"Time: {timestamp}{NL}{NL}"
+                "This usually means Ollama is not running.{NL}{NL}"
+                "Immediate actions:{NL}"
+                "1. Start Ollama: systemctl --user start ollama{NL}"
+                "2. Enable at startup: systemctl --user enable ollama{NL}"
+                "3. Verify installation: which ollama{NL}"
+                "4. Pull a test model: ollama pull llama3.2{NL}"
+                "5. Check if port 11434 is listening: ss -tlnp | grep 11434"
+            ),
+            alert_key="ollama_unavailable"
+        )
+        return True
+    return False
+
+
 def check_ollama_availability():
     """Alert if Ollama is unavailable"""
     try:
@@ -253,53 +305,13 @@ def check_ollama_availability():
         response = requests.get("http://localhost:11434/api/tags", timeout=5)
 
         if response.status_code != 200:
-            if should_alert("ollama_unavailable"):
-                send_warning(
-                    title="⚠️ Ollama Unavailable",
-                    message=(
-                        "Ollama API is not responding correctly.{NL}{NL}"
-                        f"Status code: {response.status_code}{NL}"
-                        f"Response: {response.text[:200] if response.text else 'No response'}{NL}"
-                        f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{NL}{NL}"
-                        "Impact:{NL}"
-                        "- AI job classification will fail{NL}"
-                        "- Cover letter generation disabled{NL}"
-                        "- Resume tailoring unavailable{NL}"
-                        "- Interview preparation affected{NL}{NL}"
-                        "Immediate actions:{NL}"
-                        "1. Check Ollama service: systemctl --user status ollama{NL}"
-                        "2. Restart Ollama: systemctl --user restart ollama{NL}"
-                        "3. Verify it's running: curl http://localhost:11434/api/tags{NL}"
-                        "4. Check logs: journalctl --user -u ollama{NL}"
-                        "5. Pull a model to test: ollama pull llama3.2"
-                    ),
-                    alert_key="ollama_unavailable"
-                )
-                return True
+            return _send_ollama_bad_status_alert(response)
         else:
             # Clear alert if it was previously firing
             if "ollama_unavailable" in last_alerts:
                 del last_alerts["ollama_unavailable"]
     except Exception as e:
-        if should_alert("ollama_unavailable"):
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            send_warning(
-                title="⚠️ Ollama Unavailable",
-                message=(
-                    "Cannot connect to Ollama API.{NL}{NL}"
-                    f"Error: {str(e)}{NL}"
-                    f"Time: {timestamp}{NL}{NL}"
-                    "This usually means Ollama is not running.{NL}{NL}"
-                    "Immediate actions:{NL}"
-                    "1. Start Ollama: systemctl --user start ollama{NL}"
-                    "2. Enable at startup: systemctl --user enable ollama{NL}"
-                    "3. Verify installation: which ollama{NL}"
-                    "4. Pull a test model: ollama pull llama3.2{NL}"
-                    "5. Check if port 11434 is listening: ss -tlnp | grep 11434"
-                ),
-                alert_key="ollama_unavailable"
-            )
-            return True
+        return _send_ollama_connection_error_alert(str(e))
     return False
 
 
