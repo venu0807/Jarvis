@@ -36,6 +36,7 @@ from __future__ import annotations
 import csv
 import datetime
 import os
+import re
 import sqlite3
 from pathlib import Path
 from typing import Optional
@@ -122,8 +123,14 @@ class SentTracker:
 
     def _migrate_add_column(self, conn, table: str, column: str, definition: str) -> None:
         """Add a column to an existing table if it doesn't exist (safe migration)."""
+        # Validate identifiers to prevent SQL injection in DDL
+        if not re.match(r"^[a-zA-Z0-9_]+$", table):
+            raise ValueError(f"Invalid table name: {table}")
+        if not re.match(r"^[a-zA-Z0-9_]+$", column):
+            raise ValueError(f"Invalid column name: {column}")
+
         try:
-            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+            conn.execute(f'ALTER TABLE "{table}" ADD COLUMN "{column}" {definition}')
             # Only print during actual migrations, not during tests
             if os.environ.get("JARVIS_TRACKER_VERBOSE") == "1":
                 print(f"  [migration] Added column {table}.{column}")
