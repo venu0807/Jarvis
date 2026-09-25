@@ -1,8 +1,6 @@
 import sys
 import os
 import subprocess
-import time
-import socket
 
 print('\n=============================================')
 print('🤖 JARVIS SYSTEM DIAGNOSTICS & STATUS CHECK 🤖')
