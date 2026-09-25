@@ -194,6 +194,9 @@ with tab4:
         if df_tasks.empty:
             st.info("No automation requests found. Submit a chore in the sidebar inbox!")
         else:
+            draft_updates = []
+            deploy_updates = []
+
             for idx, row in df_tasks.iterrows():
                 with st.expander(f"[{row['status'].upper()}] {row['task_description']} ({row['created_at']})"):
                     if row['status'] == 'pending':
@@ -210,11 +213,7 @@ with tab4:
                                     else:
                                         proposed_code = llm_result.text
                                     
-                                    conn2 = psycopg2.connect(**DB_PARAMS)
-                                    cur2 = conn2.cursor()
-                                    cur2.execute("UPDATE automation_tasks SET status='draft', proposed_code=%s WHERE id=%s", (proposed_code, row['id']))
-                                    conn2.commit()
-                                    conn2.close()
+                                    draft_updates.append((proposed_code, row['id']))
                                     st.success("Draft created! Please refresh the page.")
                                 else:
                                     st.error("LLM Router not available.")
@@ -231,11 +230,7 @@ with tab4:
                             with open(script_path, "w") as f:
                                 f.write(row['proposed_code'] or "# Error: No code generated")
                             
-                            conn2 = psycopg2.connect(**DB_PARAMS)
-                            cur2 = conn2.cursor()
-                            cur2.execute("UPDATE automation_tasks SET status='deployed' WHERE id=%s", (row['id'],))
-                            conn2.commit()
-                            conn2.close()
+                            deploy_updates.append((row['id'],))
                             
                             st.success(f"Script saved to {script_path} and marked as deployed!")
                             
@@ -243,6 +238,17 @@ with tab4:
                         st.success("This automation has been deployed.")
                         with st.expander("View Deployed Code"):
                             st.code(row['proposed_code'], language='python')
+
+            if draft_updates or deploy_updates:
+                conn2 = psycopg2.connect(**DB_PARAMS)
+                cur2 = conn2.cursor()
+                if draft_updates:
+                    cur2.executemany("UPDATE automation_tasks SET status='draft', proposed_code=%s WHERE id=%s", draft_updates)
+                if deploy_updates:
+                    cur2.executemany("UPDATE automation_tasks SET status='deployed' WHERE id=%s", deploy_updates)
+                conn2.commit()
+                conn2.close()
+
     except Exception as e:
         st.error(f"Error loading proposals: {e}")
 
