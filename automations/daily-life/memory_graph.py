@@ -45,13 +45,19 @@ def update_memory_graph():
 
         print(f"  📥 Found {len(recent_events)} recent events. Generating embeddings...")
         
+        event_ids = tuple(e[0] for e in recent_events)
+        if event_ids:
+            cur.execute("SELECT event_id FROM memory_embeddings WHERE event_id IN %s", (event_ids,))
+            memorized_event_ids = {row[0] for row in cur.fetchall()}
+        else:
+            memorized_event_ids = set()
+
         memorized_count = 0
         for event_id, event_type, payload, created_at in recent_events:
             # Check if we already memorized this event (using a simple metadata check)
             # Wait, earlier I recreated the table without the metadata column to make it simpler, but let's check if it has metadata.
             # Actually, the recreate command was: `CREATE TABLE memory_embeddings (id SERIAL PRIMARY KEY, event_id INTEGER REFERENCES events(id), content TEXT, embedding vector(768))`
-            cur.execute("SELECT id FROM memory_embeddings WHERE event_id = %s", (event_id,))
-            if cur.fetchone():
+            if event_id in memorized_event_ids:
                 continue # Already memorized
                 
             # 2. Format the event into a human-readable memory sentence
