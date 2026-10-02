@@ -64,16 +64,18 @@ class EventBus:
         
         def poll_loop():
             last_id = 0
+            conn = None
             while not self._stop_listen.is_set():
                 try:
-                    conn = psycopg2.connect(**self.db_params)
+                    if conn is None or conn.closed:
+                        conn = psycopg2.connect(**self.db_params)
+                        conn.autocommit = True
                     cur = conn.cursor()
                     cur.execute(
                         "SELECT id, payload FROM events WHERE event_type = %s AND id > %s ORDER BY id ASC",
                         (event_type, last_id)
                     )
                     rows = cur.fetchall()
-                    conn.close()
                     
                     for row_id, payload in rows:
                         if isinstance(payload, str):
@@ -85,7 +87,19 @@ class EventBus:
                         last_id = max(last_id, row_id)
                 except Exception as e:
                     logger.error(f"Poll error for {event_type}: {e}")
+                    if conn and not conn.closed:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+                    conn = None
                 time.sleep(poll_interval)
+
+            if conn and not conn.closed:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
         
         self._listen_thread = threading.Thread(target=poll_loop, daemon=True)
         self._listen_thread.start()
