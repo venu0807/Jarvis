@@ -36,13 +36,14 @@ class PinterestPlatform(Platform):
         if self.use_api:
             # Test API token with a simple request
             try:
-                import requests
+                import httpx
                 headers = {"Authorization": f"Bearer {self.access_token}"}
-                resp = requests.get(
-                    "https://api.pinterest.com/v5/user_account",
-                    headers=headers,
-                    timeout=10
-                )
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(
+                        "https://api.pinterest.com/v5/user_account",
+                        headers=headers,
+                        timeout=10.0
+                    )
                 return resp.status_code == 200
             except Exception:
                 return False
@@ -83,7 +84,7 @@ class PinterestPlatform(Platform):
     async def _post_api(self, content: PostContent, media_path: str) -> PostResult:
         """Post via Pinterest API v5."""
         try:
-            import requests
+            import httpx
             
             # Upload media first
             upload_url = "https://api.pinterest.com/v5/media"
@@ -94,58 +95,73 @@ class PinterestPlatform(Platform):
             
             media_type = "video" if media_path.endswith((".mp4", ".mov")) else "image"
             
-            # Create media
-            media_resp = requests.post(
-                upload_url,
-                headers=headers,
-                json={"media_type": media_type},
-                timeout=30
-            )
-            
-            if media_resp.status_code != 201:
-                return PostResult(
-                    platform=self.PLATFORM_NAME,
-                    status=PostStatus.FAILED,
-                    error=f"Media upload failed: {media_resp.text}"
-                )
-            
-            media_data = media_resp.json()
-            media_id = media_data["media_id"]
-            upload_url = media_data["upload_url"]
-            
-            # Upload file to signed URL
-            with open(media_path, "rb") as f:
-                upload_resp = requests.put(
+            async with httpx.AsyncClient() as client:
+                # Create media
+                media_resp = await client.post(
                     upload_url,
-                    data=f,
-                    headers={"Content-Type": "application/octet-stream"},
-                    timeout=60
+                    headers=headers,
+                    json={"media_type": media_type},
+                    timeout=30.0
                 )
-            
-            if upload_resp.status_code not in (200, 201):
-                return PostResult(
-                    platform=self.PLATFORM_NAME,
-                    status=PostStatus.FAILED,
-                    error=f"File upload failed: {upload_resp.text}"
+
+                if media_resp.status_code != 201:
+                    return PostResult(
+                        platform=self.PLATFORM_NAME,
+                        status=PostStatus.FAILED,
+                        error=f"Media upload failed: {media_resp.text}"
+                    )
+
+                media_data = media_resp.json()
+                media_id = media_data["media_id"]
+                upload_url = media_data["upload_url"]
+
+                # Upload file to signed URL
+                import aiofiles
+
+                async def file_generator(path, chunk_size=65536):
+                    async with aiofiles.open(path, "rb") as f:
+                        while True:
+                            chunk = await f.read(chunk_size)
+                            if not chunk:
+                                break
+                            yield chunk
+
+                file_size = os.path.getsize(media_path)
+
+                upload_resp = await client.put(
+                    upload_url,
+                    content=file_generator(media_path),
+                    headers={
+                        "Content-Type": "application/octet-stream",
+                        "Content-Length": str(file_size)
+                    },
+                    timeout=60.0
                 )
-            
-            # Create pin
-            pin_data = {
-                "board_id": self.board_id,
-                "media_id": media_id,
-                "title": content.title[:self.MAX_TITLE_LENGTH],
-                "description": content.description[:self.MAX_DESC_LENGTH],
-                "link": content.affiliate_link or "",
-                "tags": content.tags[:self.MAX_TAGS]
-            }
-            
-            pin_resp = requests.post(
-                "https://api.pinterest.com/v5/pins",
-                headers=headers,
-                json=pin_data,
-                timeout=30
-            )
-            
+
+                if upload_resp.status_code not in (200, 201):
+                    return PostResult(
+                        platform=self.PLATFORM_NAME,
+                        status=PostStatus.FAILED,
+                        error=f"File upload failed: {upload_resp.text}"
+                    )
+
+                # Create pin
+                pin_data = {
+                    "board_id": self.board_id,
+                    "media_id": media_id,
+                    "title": content.title[:self.MAX_TITLE_LENGTH],
+                    "description": content.description[:self.MAX_DESC_LENGTH],
+                    "link": content.affiliate_link or "",
+                    "tags": content.tags[:self.MAX_TAGS]
+                }
+
+                pin_resp = await client.post(
+                    "https://api.pinterest.com/v5/pins",
+                    headers=headers,
+                    json=pin_data,
+                    timeout=30.0
+                )
+
             if pin_resp.status_code == 201:
                 pin = pin_resp.json()
                 return PostResult(
@@ -239,14 +255,15 @@ class PinterestPlatform(Platform):
             return {"error": "Analytics only available via API"}
         
         try:
-            import requests
+            import httpx
             headers = {"Authorization": f"Bearer {self.access_token}"}
-            resp = requests.get(
-                f"https://api.pinterest.com/v5/pins/{post_id}/analytics",
-                headers=headers,
-                params={"metrics": "IMPRESSION,SAVE,CLICKTHROUGH,ENGAGEMENT"},
-                timeout=10
-            )
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    f"https://api.pinterest.com/v5/pins/{post_id}/analytics",
+                    headers=headers,
+                    params={"metrics": "IMPRESSION,SAVE,CLICKTHROUGH,ENGAGEMENT"},
+                    timeout=10.0
+                )
             if resp.status_code == 200:
                 return resp.json()
             return {"error": resp.text}
@@ -259,13 +276,14 @@ class PinterestPlatform(Platform):
             return False
         
         try:
-            import requests
+            import httpx
             headers = {"Authorization": f"Bearer {self.access_token}"}
-            resp = requests.delete(
-                f"https://api.pinterest.com/v5/pins/{post_id}",
-                headers=headers,
-                timeout=10
-            )
+            async with httpx.AsyncClient() as client:
+                resp = await client.delete(
+                    f"https://api.pinterest.com/v5/pins/{post_id}",
+                    headers=headers,
+                    timeout=10.0
+                )
             return resp.status_code == 204
         except Exception:
             return False
