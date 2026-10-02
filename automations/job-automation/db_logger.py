@@ -76,37 +76,70 @@ def save_jobs_to_db(results: list[ApplicationResult]):
     now = datetime.datetime.now().isoformat()
     
     with sqlite3.connect(DB_PATH) as conn:
+        jobs_data = []
+        seen_jobs_data = []
+        valid_results = []
+
         for r in results:
             job = r.job
             job_id = job.get("id", "")
             if not job_id:
                 continue
                 
-            try:
-                conn.execute("""
-                    INSERT INTO jobs (id, title, company, location, portal, url, description, status, skip_reason, timestamp)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET 
-                        status=excluded.status, 
-                        skip_reason=COALESCE(excluded.skip_reason, jobs.skip_reason),
-                        timestamp=excluded.timestamp,
-                        description=CASE WHEN excluded.description != '' THEN excluded.description ELSE jobs.description END
-                """, (
-                    job_id,
-                    job.get("title", ""),
-                    job.get("company", ""),
-                    job.get("location", ""),
-                    job.get("portal", ""),
-                    job.get("url", ""),
-                    job.get("description", ""),
-                    r.status,
-                    getattr(r, "skip_reason", None) or getattr(r, "reason", None) or "",
-                    now
-                ))
-                # Also mark seen
-                conn.execute("INSERT OR IGNORE INTO seen_jobs (id, first_seen) VALUES (?, ?)", (job_id, now))
-            except Exception as e:
-                print(f"⚠️ Could not insert job {job_id} into DB: {e}")
+            valid_results.append((r, job_id, job))
+            jobs_data.append((
+                job_id,
+                job.get("title", ""),
+                job.get("company", ""),
+                job.get("location", ""),
+                job.get("portal", ""),
+                job.get("url", ""),
+                job.get("description", ""),
+                r.status,
+                getattr(r, "skip_reason", None) or getattr(r, "reason", None) or "",
+                now
+            ))
+            seen_jobs_data.append((job_id, now))
+
+        try:
+            conn.executemany("""
+                INSERT INTO jobs (id, title, company, location, portal, url, description, status, skip_reason, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    status=excluded.status,
+                    skip_reason=COALESCE(excluded.skip_reason, jobs.skip_reason),
+                    timestamp=excluded.timestamp,
+                    description=CASE WHEN excluded.description != '' THEN excluded.description ELSE jobs.description END
+            """, jobs_data)
+
+            conn.executemany("INSERT OR IGNORE INTO seen_jobs (id, first_seen) VALUES (?, ?)", seen_jobs_data)
+        except Exception:
+            # Fallback to row-by-row if executemany fails
+            for r, job_id, job in valid_results:
+                try:
+                    conn.execute("""
+                        INSERT INTO jobs (id, title, company, location, portal, url, description, status, skip_reason, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(id) DO UPDATE SET
+                            status=excluded.status,
+                            skip_reason=COALESCE(excluded.skip_reason, jobs.skip_reason),
+                            timestamp=excluded.timestamp,
+                            description=CASE WHEN excluded.description != '' THEN excluded.description ELSE jobs.description END
+                    """, (
+                        job_id,
+                        job.get("title", ""),
+                        job.get("company", ""),
+                        job.get("location", ""),
+                        job.get("portal", ""),
+                        job.get("url", ""),
+                        job.get("description", ""),
+                        r.status,
+                        getattr(r, "skip_reason", None) or getattr(r, "reason", None) or "",
+                        now
+                    ))
+                    conn.execute("INSERT OR IGNORE INTO seen_jobs (id, first_seen) VALUES (?, ?)", (job_id, now))
+                except Exception as e:
+                    print(f"⚠️ Could not insert job {job_id} into DB: {e}")
         conn.commit()
 
     applied_results = [r for r in results if r.status == "applied"]
