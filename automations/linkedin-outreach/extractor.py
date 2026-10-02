@@ -90,7 +90,7 @@ def get_email_from_apollo(name, company, max_retries=2):
                 return None
 
             if resp.status_code == 422:
-                # Bad input — won't fix by retrying
+                # Bad input — cannot be resolved by retrying
                 print(f"  ⚠ Apollo: 422 (bad input): {resp.text[:120]}")
                 return None
 
