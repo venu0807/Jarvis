@@ -2,6 +2,7 @@ import csv
 import os
 
 import psycopg2
+from psycopg2 import extras
 
 
 def migrate():
@@ -43,10 +44,18 @@ def migrate():
         INSERT INTO products (
             product_name, image_url, affiliate_link, status, category, price,
             tags, description, pin_type, content_lines, seo_title, pin_template, board
+        ) VALUES %s
+        """
+
+        insert_query_fallback = """
+        INSERT INTO products (
+            product_name, image_url, affiliate_link, status, category, price,
+            tags, description, pin_type, content_lines, seo_title, pin_template, board
         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         
         count = 0
+        rows_to_insert = []
         for row in reader:
             if not row or not any(row):
                 continue
@@ -54,9 +63,20 @@ def migrate():
             # Ensure row has exactly 13 elements, padding if necessary
             row = row + [''] * (13 - len(row))
             row = row[:13]
+            rows_to_insert.append(tuple(row))
             
-            cur.execute(insert_query, row)
-            count += 1
+        try:
+            extras.execute_values(cur, insert_query, rows_to_insert)
+            count = len(rows_to_insert)
+        except Exception as e:
+            print(f"Bulk insert failed: {e}. Falling back to row-by-row insert.")
+            conn.rollback()
+            for row in rows_to_insert:
+                try:
+                    cur.execute(insert_query_fallback, row)
+                    count += 1
+                except Exception as row_e:
+                    print(f"Failed to insert row: {row}. Error: {row_e}")
             
     conn.commit()
     cur.close()
