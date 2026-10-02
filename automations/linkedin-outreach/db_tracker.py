@@ -38,6 +38,7 @@ import datetime
 import os
 import sqlite3
 from pathlib import Path
+import re
 from typing import Optional
 
 DB_PATH = Path(__file__).resolve().parent / "sent_tracker.db"
@@ -122,6 +123,13 @@ class SentTracker:
 
     def _migrate_add_column(self, conn, table: str, column: str, definition: str) -> None:
         """Add a column to an existing table if it doesn't exist (safe migration)."""
+        if not re.match(r"^[A-Za-z0-9_]+$", table):
+            raise ValueError(f"Invalid table name: {table}")
+        if not re.match(r"^[A-Za-z0-9_]+$", column):
+            raise ValueError(f"Invalid column name: {column}")
+        if not re.match(r"^[A-Za-z0-9_ ']+$", definition):
+            raise ValueError(f"Invalid column definition: {definition}")
+
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
             # Only print during actual migrations, not during tests
