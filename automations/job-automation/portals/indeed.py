@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import random
+from collections import deque
 from pathlib import Path
 from playwright.async_api import Page
 from .base import BasePortal, ApplicationResult, is_experienced_role
@@ -217,11 +218,11 @@ class IndeedPortal(BasePortal):
 
                     print(f"  🔍 Indeed: {len(job_data)} jobs for '{role}' in {city}")
 
-                    queue = job_data.copy()
+                    queue = deque(job_data)
                     visited = set(jd.get("jk", "").strip() for jd in queue)
 
                     while queue and applied < daily_limit:
-                        jd = queue.pop(0)
+                        jd = queue.popleft()
 
                         jk      = jd.get("jk", "").strip()
                         title   = jd.get("title", "").strip()
