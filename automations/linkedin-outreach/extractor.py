@@ -20,6 +20,8 @@ from typing import Optional, Tuple
 EMAIL_REGEX = re.compile(
     r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b"
 )
+VALIDATION_REGEX = re.compile(r"[^@]+@[^@]+\.[a-zA-Z]{2,}$")
+
 # Trailing punctuation that's NOT part of an email
 TRAILING_PUNCT = ".,;:!?)>]'\""
 
@@ -39,7 +41,7 @@ def extract_email_from_text(text):
         # Discard obvious garbage
         if not candidate or ".." in candidate.split("@")[0]:
             continue
-        if not re.match(r"[^@]+@[^@]+\.[a-zA-Z]{2,}$", candidate):
+        if not VALIDATION_REGEX.match(candidate):
             continue
 
         return candidate
