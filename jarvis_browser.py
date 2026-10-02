@@ -373,12 +373,12 @@ class SyncBrowser:
             import time
             try:
                 # Kill existing Edge processes before starting a new debugging session
-                kill_cmd = '/mnt/c/Windows/System32/taskkill.exe /F /IM msedge.exe'
-                subprocess.run(kill_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                kill_cmd = ['/mnt/c/Windows/System32/taskkill.exe', '/F', '/IM', 'msedge.exe']
+                subprocess.run(kill_cmd, shell=False, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
                 time.sleep(2)
                 
-                cmd = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -WindowStyle Normal -Command "Start-Process \'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\' -ArgumentList \'--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile\'"'
-                subprocess.run(cmd, shell=True)
+                cmd = ['/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe', '-WindowStyle', 'Normal', '-Command', "Start-Process 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe' -ArgumentList '--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=C:\\JarvisEdgeProfile'"]
+                subprocess.run(cmd, shell=False)
                 time.sleep(6) # Wait for Edge to fully open and start CDP server
                 
                 browser = self._playwright.chromium.connect_over_cdp(cdp_url, timeout=10000)
