@@ -239,6 +239,21 @@ class TestSafeCloseAsync:
         obj = object()
         await jb.safe_close_async(obj)  # should not raise
 
+    @pytest.mark.asyncio
+    async def test_non_callable_close(self):
+        """Objects with a non-callable close attribute are silently ignored."""
+        obj = MagicMock()
+        obj.close = "not callable"
+        await jb.safe_close_async(obj)  # should not raise
+
+    @pytest.mark.asyncio
+    async def test_does_not_swallow_base_exception(self):
+        """Does not swallow BaseExceptions like KeyboardInterrupt."""
+        obj = AsyncMock()
+        obj.close.side_effect = KeyboardInterrupt("Ctrl-C")
+        with pytest.raises(KeyboardInterrupt):
+            await jb.safe_close_async(obj)
+
 
 class TestSafeCloseSync:
     """safe_close_sync — error-tolerant sync close."""
@@ -262,6 +277,19 @@ class TestSafeCloseSync:
     def test_no_close_attr(self):
         """Objects without close() are silently ignored."""
         jb.safe_close_sync(object())  # should not raise
+
+    def test_non_callable_close(self):
+        """Objects with a non-callable close attribute are silently ignored."""
+        obj = MagicMock()
+        obj.close = "not callable"
+        jb.safe_close_sync(obj)  # should not raise
+
+    def test_does_not_swallow_base_exception(self):
+        """Does not swallow BaseExceptions like KeyboardInterrupt."""
+        obj = MagicMock()
+        obj.close.side_effect = KeyboardInterrupt("Ctrl-C")
+        with pytest.raises(KeyboardInterrupt):
+            jb.safe_close_sync(obj)
 
 
 # ==============================================================================
