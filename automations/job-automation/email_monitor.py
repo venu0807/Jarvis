@@ -84,6 +84,14 @@ def process_emails():
 
         conn = sqlite3.connect(DB_PATH)
         
+        # Pre-fetch existing communications to avoid N+1 queries
+        existing_comms = set()
+        try:
+            for row in conn.execute("SELECT email_subject, company FROM job_communications"):
+                existing_comms.add((row[0], row[1]))
+        except Exception as e:
+            print(f"Failed to fetch existing communications: {e}")
+
         for e_id in email_ids:
             res, msg_data = mail.fetch(e_id, '(RFC822)')
             if res != "OK":
@@ -134,9 +142,8 @@ def process_emails():
                             break
                             
                     if matched_company:
-                        # Check if already processed
-                        exists = conn.execute("SELECT 1 FROM job_communications WHERE email_subject = ? AND company = ?", (subject, matched_company)).fetchone()
-                        if not exists:
+                        # Check if already processed using O(1) set lookup
+                        if (subject, matched_company) not in existing_comms:
                             status_inferred = extract_status(subject, body)
                             print(f"Match found! Company: {matched_company}, Status: {status_inferred}")
                             
@@ -145,6 +152,8 @@ def process_emails():
                                 VALUES (?, ?, ?, ?, ?, ?)
                             """, (matched_job_id, matched_company, subject, snippet, status_inferred, datetime.now().isoformat()))
                             conn.commit()
+
+                            existing_comms.add((subject, matched_company))
 
                             # === TELEGRAM ALERT ===
                             if _TG:
