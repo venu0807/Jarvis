@@ -26,9 +26,11 @@ Companies seeded (auto-update this list as you discover others):
               google, microsoft, amazon  (browser-mode jobs.json fetch)
 """
 import argparse
+import hashlib
 import json
 import sqlite3
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -56,6 +58,40 @@ if JOB_ENV.exists():
             os.environ.setdefault(k.strip(), v.strip().strip('"'))
 
 TIMEOUT_S = 12
+
+CACHE_DIR = OUT_DIR / ".cache"
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+CACHE_EXPIRE_S = 3600 * 12  # 12 hours
+
+
+def fetch_json_with_cache(url: str, timeout: int = TIMEOUT_S) -> dict:
+    """Fetch JSON from URL, caching to disk for 12 hours."""
+    cache_key = hashlib.md5(url.encode('utf-8')).hexdigest()
+    cache_file = CACHE_DIR / f"{cache_key}.json"
+
+    if cache_file.exists():
+        if time.time() - cache_file.stat().st_mtime < CACHE_EXPIRE_S:
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass  # Fallback to network if cache is corrupted
+
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (career-pages-bot/1.0)",
+        "Accept": "application/json",
+    })
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        data = json.loads(r.read())
+
+    try:
+        with open(cache_file, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+    return data
+
 
 # ── Company catalog ────────────────────────────────────────────────────────────
 # Format: company_name → {"platform": "greenhouse"|"lever"|"custom",
@@ -98,12 +134,7 @@ def fetch_greenhouse(board: str) -> list:
     """
     url = f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs?content=true"
     try:
-        req = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (career-pages-bot/1.0)",
-            "Accept": "application/json",
-        })
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:
-            data = json.loads(r.read())
+        data = fetch_json_with_cache(url)
         jobs = []
         for j in data.get("jobs", []):
             # Greenhouse returns content as HTML with HTML entities (< etc.)
@@ -162,12 +193,7 @@ def fetch_lever(board: str) -> list:
     """
     url = f"https://api.lever.co/v0/postings/{board}?mode=json"
     try:
-        req = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (career-pages-bot/1.0)",
-            "Accept": "application/json",
-        })
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:
-            data = json.loads(r.read())
+        data = fetch_json_with_cache(url)
         if not isinstance(data, list):
             return []
 
@@ -194,11 +220,10 @@ def fetch_lever(board: str) -> list:
             if len(data) <= 50:
                 try:
                     jid = j.get("id")
-                    r2 = urllib.request.urlopen(
+                    body = fetch_json_with_cache(
                         f"https://api.lever.co/v0/postings/{board}/{jid}",
                         timeout=8,
                     )
-                    body = json.loads(r2.read())
                     item["raw"]["description"] = _extract_lever_description(body)
                 except Exception:
                     pass  # bulk-only; keep going
