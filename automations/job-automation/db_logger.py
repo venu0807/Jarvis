@@ -113,6 +113,7 @@ def save_jobs_to_db(results: list[ApplicationResult]):
     if applied_results and os.getenv("PG_PASSWORD"):
         try:
             import psycopg2
+            import psycopg2.extras
             pg_conn = psycopg2.connect(
                 dbname=os.getenv("PG_DB", "pinterest_db"),
                 user=os.getenv("PG_USER", "venu"),
@@ -120,12 +121,31 @@ def save_jobs_to_db(results: list[ApplicationResult]):
                 host=os.getenv("PG_HOST", "127.0.0.1"),
             )
             pg_cur = pg_conn.cursor()
-            for r in applied_results:
-                job_payload = json.dumps(r.job)
-                pg_cur.execute(
-                    "INSERT INTO events (source, event_type, payload) VALUES (%s, %s, %s)",
-                    ("job_bot", "jobs.applied", job_payload)
+
+            data_to_insert = [
+                ("job_bot", "jobs.applied", json.dumps(r.job))
+                for r in applied_results
+            ]
+
+            try:
+                psycopg2.extras.execute_values(
+                    pg_cur,
+                    "INSERT INTO events (source, event_type, payload) VALUES %s",
+                    data_to_insert
                 )
+            except Exception as bulk_e:
+                print(f"⚠️ Bulk insert failed, falling back to individual inserts: {bulk_e}")
+                pg_conn.rollback()
+                for row in data_to_insert:
+                    try:
+                        pg_cur.execute(
+                            "INSERT INTO events (source, event_type, payload) VALUES (%s, %s, %s)",
+                            row
+                        )
+                    except Exception as row_e:
+                        print(f"⚠️ Failed to insert row: {row_e}")
+                        pg_conn.rollback()
+
             pg_conn.commit()
             pg_cur.close()
             pg_conn.close()
