@@ -4,6 +4,7 @@ Jarvis Quick Setup — guided setup for ₹15k service clients.
 Run: python quick_setup.py
 """
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -15,7 +16,9 @@ def step(num, title, command=None):
     print(f"  Step {num}: {title}")
     print(f"{'='*60}")
     if command:
-        result = subprocess.run(command, shell=True, cwd=BASE)
+        if isinstance(command, str):
+            command = shlex.split(command)
+        result = subprocess.run(command, shell=False, cwd=BASE)
         if result.returncode != 0:
             print(f"  ⚠️  Step {num} had issues. Check above.")
 
