@@ -22,22 +22,20 @@ TIMEOUT_MS = 60_000
 HUMAN_MIN_SLEEP = 2.0
 HUMAN_MAX_SLEEP = 5.0
 CHECKPOINT_MAX_WAIT_S = 180      # SMS/email OTPs can take 2-3 min
-CHECKPOINT_POLL_S = 5
 
 
 def _wait_for_checkpoint(page, max_wait_s: int = CHECKPOINT_MAX_WAIT_S) -> bool:
-    """Poll until LinkedIn checkpoint URL clears. Returns True when cleared."""
-    waited = 0
-    while waited < max_wait_s:
-        url = page.url
-        # URLs that mean "still on a challenge": /checkpoint, /challenge, /authwall
-        if not any(seg in url for seg in ("/checkpoint", "/challenge", "/authwall")):
-            return True
-        page.wait_for_timeout(CHECKPOINT_POLL_S * 1000)
-        waited += CHECKPOINT_POLL_S
-        print(f"  ⏳ checkpoint still active, {waited}/{max_wait_s}s...")
-    print("  ⚠ checkpoint wait timed out")
-    return False
+    """Wait until LinkedIn checkpoint URL clears using wait_for_url. Returns True when cleared."""
+    print(f"  ⏳ checkpoint active, waiting up to {max_wait_s}s...")
+    try:
+        page.wait_for_url(
+            lambda url: not any(seg in url for seg in ("/checkpoint", "/challenge", "/authwall")),
+            timeout=max_wait_s * 1000
+        )
+        return True
+    except Exception:
+        print("  ⚠ checkpoint wait timed out")
+        return False
 
 def scrape_recruiter_profile(profile_url: str) -> str:
     """Uses Playwright to navigate to a recruiter's profile and extract their About section and recent activity."""
@@ -134,7 +132,7 @@ def scrape_linkedin_posts(job_role):
                     print("No credentials provided in .env, please login manually.")
                     page.wait_for_timeout(90000)
 
-            # Fix #6 — polling-based checkpoint wait (was a flat 60s sleep)
+            # Update #6 — polling-based checkpoint wait (was a flat 60s sleep)
             if any(seg in page.url for seg in ("/checkpoint", "/challenge", "/authwall")):
                 print("Security checkpoint detected. Please complete it manually.")
                 if not _wait_for_checkpoint(page):
